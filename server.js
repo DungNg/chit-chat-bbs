@@ -9,7 +9,7 @@
  */
 
 import { createServer } from 'node:http';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, statSync, createReadStream } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -79,13 +79,13 @@ const server = createServer((req, res) => {
       res.end('chat.db not found');
       return;
     }
-    const stat = (await import('node:fs')).statSync(dbPath);
+    const stat = statSync(dbPath);
     res.writeHead(200, {
       'Content-Type': 'application/octet-stream',
       'Content-Disposition': `attachment; filename="chat-${new Date().toISOString().slice(0,10)}.db"`,
       'Content-Length': stat.size,
     });
-    const stream = (await import('node:fs')).createReadStream(dbPath);
+    const stream = createReadStream(dbPath);
     stream.pipe(res);
     console.log('[DOWNLOAD] chat.db downloaded by admin');
     return;
