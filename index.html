@@ -830,8 +830,6 @@ window.onload=()=>{
   document.getElementById('uInput').addEventListener('keydown',e=>{if(e.key==='Enter')enterChat()});
   document.getElementById('msgInput').addEventListener('keydown',e=>{
     if(e.key==='Enter'){doSend();return}
-    const v=document.getElementById('msgInput').value;
-    if(v.startsWith('/nick ')){/* handle slash cmd */}
   });
   document.getElementById('msgInput').addEventListener('input',onType);
   document.getElementById('rInput').addEventListener('keydown',e=>{if(e.key==='Enter')confirmRename()});
@@ -840,6 +838,16 @@ window.onload=()=>{
     atBottom=this.scrollTop+this.clientHeight>=this.scrollHeight-80;
     if(atBottom){newCount=0;rmBadge()}
   });
+
+  // Mobile: unlock audio on touchend of send button (fires before onclick, counts as gesture)
+  document.getElementById('sendBtn').addEventListener('touchend', e=>{
+    e.preventDefault(); // prevent double-fire with onclick
+    doSend();
+  }, {passive:false});
+
+  // Also unlock on any touch anywhere — belt-and-suspenders for iOS
+  document.addEventListener('touchend', unlockAudio, {once:true});
+  document.addEventListener('touchstart', unlockAudio, {once:true});
 };
 
 function valNick(n){
@@ -888,8 +896,8 @@ function setConn(ok){
 
 function onMsg(m){
   switch(m.type){
-    case'history':m.messages.forEach(x=>addMsg({u:x.username,txt:x.message,d:new Date(x.createdDate),own:x.username===user,skip:true}));scrollBot();break;
-    case'message':addMsg({u:m.username,txt:m.message,d:new Date(m.createdDate),own:m.username===user});clrTypFor(m.username);break;
+    case'history':m.messages.forEach(x=>addMsg({u:x.username,txt:x.message,d:new Date(x.createdDate),own:x.username.toUpperCase()===user,skip:true}));scrollBot();break;
+    case'message':addMsg({u:m.username,txt:m.message,d:new Date(m.createdDate),own:m.username.toUpperCase()===user});clrTypFor(m.username);break;
     case'system':addSys(m.text.toUpperCase());break;
     case'online':
       document.getElementById('onlineCount').textContent=m.count;
@@ -999,7 +1007,9 @@ function addMsg({u,txt,d,own,skip=false}){
   list.appendChild(row);
 
   if(own||atBottom)scrollBot(true);
-  else if(!skip){newCount++;showBadge();if(!own)pNotif()}
+  // play notif for ALL incoming messages (not just when scrolled up)
+  if(!skip&&!own) pNotif();
+  if(!own&&!atBottom){newCount++;showBadge();}
 }
 
 function scrollBot(sm=false){
