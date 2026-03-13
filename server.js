@@ -67,8 +67,6 @@ const server = createServer((req, res) => {
 
   // GET /api/history — last 50 messages (newest first → reverse for display)
   if (url.pathname === '/api/history') {
-    const secret = (process.env.RESET_KEY || 'changeme').trim();
-    console.log(secret);
     const rows = getRecent.all().reverse();
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(rows));
