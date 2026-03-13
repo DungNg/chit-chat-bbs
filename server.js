@@ -22,14 +22,13 @@ import { fileURLToPath } from 'node:url';
 const DISCORD_WEBHOOK = process.env.DISCORD_WEBHOOK || '';
 
 function notifyDiscord(event, username, text = null) {
-  if (!DISCORD_WEBHOOK) { console.log('[DISCORD] No webhook configured'); return; }
+  if (!DISCORD_WEBHOOK) return;
   try {
     const content = event === 'join'
       ? `👤 **${username}** vừa tham gia **CHIT-CHAT BBS**`
       : `💬 **${username}**: ${text}`;
     const body = JSON.stringify({ content });
     const url = new URL(DISCORD_WEBHOOK);
-    console.log(`[DISCORD] Sending to ${url.hostname}${url.pathname.slice(0,30)}...`);
     const req = https.request({
       hostname: url.hostname,
       path: url.pathname + url.search,
@@ -38,7 +37,7 @@ function notifyDiscord(event, username, text = null) {
     }, res => {
       let data = '';
       res.on('data', c => data += c);
-      res.on('end', () => console.log(`[DISCORD] Response ${res.statusCode}: ${data.slice(0,100)}`));
+      res.on('end', () => { if (res.statusCode >= 400) console.error(`[DISCORD] Error ${res.statusCode}: ${data.slice(0,100)}`); });
     });
     req.on('error', err => console.error('[DISCORD] Request error:', err.message));
     req.write(body);
@@ -62,7 +61,6 @@ const DB_PATH = path.join(DB_DIR, 'chat.db');
 import { mkdirSync } from 'node:fs';
 try { mkdirSync(DB_DIR, { recursive: true }); } catch(_) {}
 
-console.log(`  → DB path: ${DB_PATH}`);
 const db = new DatabaseSync(DB_PATH);
 
 db.exec(`
@@ -112,7 +110,6 @@ const server = createServer((req, res) => {
     const key = (url.searchParams.get('key') || '').trim();
     const secret = (process.env.RESET_KEY || 'changeme').trim();
     if (key !== secret) {
-      console.log(`[AUTH FAIL] download — got: "${key}" expected: "${secret}"`);
       res.writeHead(403, { 'Content-Type': 'text/plain' });
       res.end('403 Forbidden');
       return;
@@ -131,21 +128,18 @@ const server = createServer((req, res) => {
     });
     const stream = createReadStream(dbPath);
     stream.pipe(res);
-    console.log('[DOWNLOAD] chat.db downloaded by admin');
     return;
   }
   if (url.pathname === '/admin/reset') {
     const key = (url.searchParams.get('key') || '').trim();
     const secret = (process.env.RESET_KEY || 'changeme').trim();
     if (key !== secret) {
-      console.log(`[AUTH FAIL] reset — got: "${key}" expected: "${secret}"`);
       res.writeHead(403, { 'Content-Type': 'text/plain' });
       res.end('403 Forbidden');
       return;
     }
     db.exec('DELETE FROM messages;');
     const count = db.prepare('SELECT COUNT(*) as c FROM messages').get().c;
-    console.log('[RESET] Messages cleared by admin');
     broadcast({ type: 'system', text: '*** DATABASE WIPED BY ADMIN ***' });
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     res.end(`OK — messages deleted. Rows remaining: ${count}`);
@@ -325,7 +319,6 @@ server.on('upgrade', (req, socket, head) => {
         broadcastOnlineCount();
         sendTo(socket, { type: 'online', count: uniqueOnlineCount() });
         notifyDiscord('join', username);
-        console.log(`[JOIN] ${username}`);
       }
 
       // ── MESSAGE ──
@@ -347,7 +340,6 @@ server.on('upgrade', (req, socket, head) => {
         // Send to ALL (including sender so they get server-confirmed timestamp)
         broadcast(payload);
         notifyDiscord(null, client.username, text);
-        console.log(`[MSG] ${client.username}: ${text.slice(0, 60)}`);
       }
 
       // ── TYPING ──
@@ -364,7 +356,6 @@ server.on('upgrade', (req, socket, head) => {
         const oldName = client.username;
         client.username = newName;
         broadcast({ type: 'system', text: `${oldName} renamed to ${newName}` });
-        console.log(`[RENAME] ${oldName} → ${newName}`);
       }
     }
   });
@@ -385,8 +376,5 @@ server.on('upgrade', (req, socket, head) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`\n  PRIVATE.CHAT server running`);
-  console.log(`  → http://localhost:${PORT}`);
-  console.log(`  → WebSocket ws://localhost:${PORT}`);
-  console.log(`  → DB: chat.db (SQLite)\n`);
+  console.log(`CHIT-CHAT BBS running on port ${PORT}`);
 });
