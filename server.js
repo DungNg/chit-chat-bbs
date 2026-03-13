@@ -21,23 +21,28 @@ import { fileURLToPath } from 'node:url';
 // ─────────────────────────────────────────────
 const DISCORD_WEBHOOK = process.env.DISCORD_WEBHOOK || '';
 
-function notifyDiscord(username) {
-  if (!DISCORD_WEBHOOK) return;
+function notifyDiscord(event, username, text = null) {
+  if (!DISCORD_WEBHOOK) { console.log('[DISCORD] No webhook configured'); return; }
   try {
-    const body = JSON.stringify({
-      content: `👤 **${username}** vừa tham gia **CHIT-CHAT BBS**`,
-    });
+    const content = event === 'join'
+      ? `👤 **${username}** vừa tham gia **CHIT-CHAT BBS**`
+      : `💬 **${username}**: ${text}`;
+    const body = JSON.stringify({ content });
     const url = new URL(DISCORD_WEBHOOK);
+    console.log(`[DISCORD] Sending to ${url.hostname}${url.pathname.slice(0,30)}...`);
     const req = https.request({
       hostname: url.hostname,
       path: url.pathname + url.search,
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
-    }, res => res.resume());
-    req.on('error', err => console.error('[DISCORD] Failed:', err.message));
+    }, res => {
+      let data = '';
+      res.on('data', c => data += c);
+      res.on('end', () => console.log(`[DISCORD] Response ${res.statusCode}: ${data.slice(0,100)}`));
+    });
+    req.on('error', err => console.error('[DISCORD] Request error:', err.message));
     req.write(body);
     req.end();
-    console.log(`[DISCORD] Notified: ${username} joined`);
   } catch (err) {
     console.error('[DISCORD] Failed:', err.message);
   }
@@ -319,7 +324,7 @@ server.on('upgrade', (req, socket, head) => {
         broadcast({ type: 'system', text: `${username} joined` }, socket);
         broadcastOnlineCount();
         sendTo(socket, { type: 'online', count: uniqueOnlineCount() });
-        notifyDiscord(username);
+        notifyDiscord('join', username);
         console.log(`[JOIN] ${username}`);
       }
 
@@ -341,6 +346,7 @@ server.on('upgrade', (req, socket, head) => {
         };
         // Send to ALL (including sender so they get server-confirmed timestamp)
         broadcast(payload);
+        notifyDiscord(null, client.username, text);
         console.log(`[MSG] ${client.username}: ${text.slice(0, 60)}`);
       }
 
