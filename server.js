@@ -20,7 +20,14 @@ const PORT = process.env.PORT || 3000;
 // ─────────────────────────────────────────────
 // DATABASE SETUP (node:sqlite built-in)
 // ─────────────────────────────────────────────
-const db = new DatabaseSync(path.join(__dirname, 'chat.db'));
+const DB_DIR  = process.env.DB_DIR || path.join(__dirname, 'data');
+const DB_PATH = path.join(DB_DIR, 'chat.db');
+
+// Ensure data directory exists (for local dev without volume)
+import { mkdirSync } from 'node:fs';
+try { mkdirSync(DB_DIR, { recursive: true }); } catch(_) {}
+
+const db = new DatabaseSync(DB_PATH);
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS messages (
@@ -73,7 +80,7 @@ const server = createServer((req, res) => {
       res.end('403 Forbidden');
       return;
     }
-    const dbPath = path.join(__dirname, 'chat.db');
+    const dbPath = DB_PATH;
     if (!existsSync(dbPath)) {
       res.writeHead(404, { 'Content-Type': 'text/plain' });
       res.end('chat.db not found');
