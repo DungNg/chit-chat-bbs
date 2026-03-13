@@ -561,17 +561,76 @@ body::after {
   box-shadow: var(--crt-glow);
 }
 
-/* Pixel corner decorations */
-.px-corner {
-  position: absolute;
-  width: 8px; height: 8px;
-  background: var(--bg);
-  border: 2px solid var(--green);
+/* ── RESPONSIVE ── */
+@media (max-width: 600px) {
+
+  /* Login */
+  .terminal-box { width: 100%; margin: 0; border-left: none; border-right: none; border-top: none; }
+  .screen { align-items: flex-start; }
+  .tb-body { padding: 16px; }
+  .ascii-logo { display: none; }
+  .tb-title-bar { font-size: 6px; padding: 5px 10px; }
+  .tb-title-bar span:first-child::after { content: 'CHIT-CHAT BBS'; }
+  .tb-title-bar span:first-child { font-size: 0; }
+  .tb-title-bar span:first-child::after { font-size: 6px; }
+  .tb-label { font-size: 15px; }
+  .tb-input { font-size: 18px; }
+  .tb-btn { font-size: 7px; padding: 10px; }
+  .sys-info { font-size: 10px; }
+
+  /* Status bar — hide verbose items */
+  .status-bar { font-size: 6px; padding: 4px 8px; }
+  .status-left span:nth-child(2) { display: none; } /* NODE: #ANON-01 */
+  .status-left span:nth-child(3) { display: none; } /* clock */
+
+  /* Chat header */
+  .chat-header { padding: 7px 10px; flex-wrap: wrap; gap: 6px; }
+  .ch-logo { font-size: 7px; }
+  .ch-channel { font-size: 14px; }
+  .online-badge { font-size: 13px; padding: 1px 7px; }
+  .ch-right { gap: 6px; }
+  .user-tag { font-size: 14px; }
+  .btn-retro { font-size: 13px; padding: 2px 7px; }
+
+  /* Messages */
+  .msgs-wrap { padding: 8px 8px; }
+  .msg-line { font-size: 12px; }
+  .msg-ts { font-size: 10px; }
+  .msg-sys { font-size: 10px; }
+
+  /* Typing bar */
+  .typing-bar { padding: 3px 10px; font-size: 11px; }
+
+  /* Input area */
+  .input-area {}
+  .input-row { flex-wrap: nowrap; }
+  .input-prompt { padding: 7px 8px; font-size: 18px; }
+  .input-nick { font-size: 14px; padding: 7px 6px; }
+  .chat-input { font-size: 16px; padding: 7px 4px; }
+  .btn-transmit { font-size: 6px; padding: 0 10px; letter-spacing: .05em; }
+  .input-hint { font-size: 9px; padding: 3px 10px 5px; }
+
+  /* New msg badge */
+  .new-badge { font-size: 6px; padding: 6px 12px; bottom: 70px; }
+
+  /* Toast */
+  .toast-wrap { right: 8px; left: 8px; align-items: stretch; }
+  .toast { font-size: 11px; min-width: unset; }
+
+  /* Modal */
+  .modal-box { width: calc(100vw - 24px); }
+  .modal-body { padding: 16px; }
+  .modal-tb { font-size: 6px; }
+  .modal-title { font-size: 18px; }
+  .btn-modal-cancel { font-size: 16px; }
+  .btn-modal-ok { font-size: 7px; }
 }
-.px-tl { top: -2px; left: -2px; }
-.px-tr { top: -2px; right: -2px; }
-.px-bl { bottom: -2px; left: -2px; }
-.px-br { bottom: -2px; right: -2px; }
+
+@media (max-width: 380px) {
+  .input-nick { display: none; }
+  .ch-channel { display: none; }
+  .btn-retro { display: none; }
+}
 </style>
 </head>
 <body>
