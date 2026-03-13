@@ -75,9 +75,10 @@ const server = createServer((req, res) => {
 
   // GET /admin/download?key=... — tải file chat.db về máy
   if (url.pathname === '/admin/download') {
-    const key = url.searchParams.get('key') || '';
-    const secret = process.env.RESET_KEY || 'changeme';
+    const key = (url.searchParams.get('key') || '').trim();
+    const secret = (process.env.RESET_KEY || 'changeme').trim();
     if (key !== secret) {
+      console.log(`[AUTH FAIL] download — got: "${key}" expected: "${secret}"`);
       res.writeHead(403, { 'Content-Type': 'text/plain' });
       res.end('403 Forbidden');
       return;
@@ -100,9 +101,10 @@ const server = createServer((req, res) => {
     return;
   }
   if (url.pathname === '/admin/reset') {
-    const key = url.searchParams.get('key') || '';
-    const secret = process.env.RESET_KEY || 'changeme';
+    const key = (url.searchParams.get('key') || '').trim();
+    const secret = (process.env.RESET_KEY || 'changeme').trim();
     if (key !== secret) {
+      console.log(`[AUTH FAIL] reset — got: "${key}" expected: "${secret}"`);
       res.writeHead(403, { 'Content-Type': 'text/plain' });
       res.end('403 Forbidden');
       return;
