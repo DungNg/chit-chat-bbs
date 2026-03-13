@@ -716,7 +716,7 @@ body::after {
         <div class="input-nick" id="inputNick">ANON</div>
         <div style="color:var(--green-dim);padding:8px 2px;font-family:'Share Tech Mono',monospace">:</div>
         <input class="chat-input" id="msgInput" type="text" placeholder="TYPE MESSAGE, HIT ENTER TO TRANSMIT..." maxlength="500" autocomplete="off" spellcheck="false"/>
-        <button class="btn-transmit" id="sendBtn" onclick="doSend()">SEND</button>
+        <button class="btn-transmit" id="sendBtn">SEND</button>
       </div>
       <div class="input-hint">&gt; ENTER = SEND &nbsp;|&nbsp; /nick NEW_NAME = RENAME &nbsp;|&nbsp; ZERO LOGS &nbsp;|&nbsp; STAY ANON</div>
     </div>
@@ -839,11 +839,12 @@ window.onload=()=>{
     if(atBottom){newCount=0;rmBadge()}
   });
 
-  // Mobile: unlock audio on touchend of send button (fires before onclick, counts as gesture)
+  // Send button: touchend cho mobile (preventDefault chặn click theo sau), click cho desktop
   document.getElementById('sendBtn').addEventListener('touchend', e=>{
-    e.preventDefault(); // prevent double-fire with onclick
+    e.preventDefault();
     doSend();
   }, {passive:false});
+  document.getElementById('sendBtn').addEventListener('click', doSend);
 
   // Also unlock on any touch anywhere — belt-and-suspenders for iOS
   document.addEventListener('touchend', unlockAudio, {once:true});
@@ -896,7 +897,11 @@ function setConn(ok){
 
 function onMsg(m){
   switch(m.type){
-    case'history':m.messages.forEach(x=>addMsg({u:x.username,txt:x.message,d:new Date(x.createdDate),own:x.username.toUpperCase()===user,skip:true}));scrollBot();break;
+    case'history':
+      document.getElementById('msgsList').innerHTML = '';
+      m.messages.forEach(x=>addMsg({u:x.username,txt:x.message,d:new Date(x.createdDate),own:x.username.toUpperCase()===user,skip:true}));
+      scrollBot();
+      break;
     case'message':addMsg({u:m.username,txt:m.message,d:new Date(m.createdDate),own:m.username.toUpperCase()===user});clrTypFor(m.username);break;
     case'system':addSys(m.text.toUpperCase());break;
     case'online':
