@@ -20,13 +20,15 @@ const PORT = process.env.PORT || 3000;
 // ─────────────────────────────────────────────
 // DATABASE SETUP (node:sqlite built-in)
 // ─────────────────────────────────────────────
+// Railway persistent volume mounts tại /data (set DB_DIR=/data trong Railway Variables)
+// Local dev: lưu vào ./data/
 const DB_DIR  = process.env.DB_DIR || path.join(__dirname, 'data');
 const DB_PATH = path.join(DB_DIR, 'chat.db');
 
-// Ensure data directory exists (for local dev without volume)
 import { mkdirSync } from 'node:fs';
 try { mkdirSync(DB_DIR, { recursive: true }); } catch(_) {}
 
+console.log(`  → DB path: ${DB_PATH}`);
 const db = new DatabaseSync(DB_PATH);
 
 db.exec(`

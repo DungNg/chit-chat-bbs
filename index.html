@@ -771,24 +771,39 @@ let typClear={},typActive=new Set(),atBottom=true,newCount=0;
 // Auto wss:// on HTTPS (required for Railway / any HTTPS host)
 const WS=`${location.protocol==='https:'?'wss':'ws'}://${location.host}`;
 
-// ── AUDIO (8-bit, iOS/Android compatible) ──
-// iOS rule: AudioContext must be created AND resumed inside a direct user gesture handler.
-// We create it once on first touch/click, then reuse forever.
+// ── AUDIO (iOS/Android/Desktop compatible) ──
+//
+// iOS quirk: AudioContext phải được unlock bằng cách PLAY một buffer thật
+// (dù silent) trong gesture handler. Sau đó mới có thể play bất cứ lúc nào.
+// Chỉ resume() thôi là chưa đủ trên iOS Safari.
+//
 let _actx = null;
+let _audioUnlocked = false;
 
-async function ensureAudio() {
+function _initCtx() {
+  if (!_actx) {
+    _actx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+}
+
+// Gọi cái này trong GESTURE HANDLER (click/touchend/keydown)
+// Phát một buffer im lặng để iOS coi là "đã có interaction"
+async function unlockAudio() {
   try {
-    if (!_actx) {
-      _actx = new (window.AudioContext || window.webkitAudioContext)();
-    }
-    if (_actx.state === 'suspended' || _actx.state === 'interrupted') {
-      await _actx.resume();
-    }
+    _initCtx();
+    if (_actx.state === 'suspended') await _actx.resume();
+    // Play silent 1-frame buffer — iOS yêu cầu bước này
+    const buf = _actx.createBuffer(1, 1, 22050);
+    const src = _actx.createBufferSource();
+    src.buffer = buf;
+    src.connect(_actx.destination);
+    src.start(0);
+    _audioUnlocked = true;
   } catch(_) {}
 }
 
 function beep8(notes) {
-  if (!_actx || _actx.state !== 'running') return; // not unlocked yet
+  if (!_actx || !_audioUnlocked) return;
   try {
     notes.forEach(([f, t, d]) => {
       const o = _actx.createOscillator(), g = _actx.createGain();
@@ -847,7 +862,7 @@ async function enterChat(){
   document.getElementById('loginScreen').classList.add('hidden');
   document.getElementById('chatScreen').classList.remove('hidden');
   connectWS();
-  await ensureAudio(); // must await inside gesture handler for iOS
+  await unlockAudio(); // play silent buffer → iOS fully unlocked after this
   pJoin();
   addSys(`CONNECTED AS [${user}] — WELCOME TO CHIT-CHAT BBS`);
 }
@@ -885,7 +900,7 @@ function onMsg(m){
 }
 
 async function doSend(){
-  await ensureAudio(); // each send is a gesture — keep context alive on iOS
+  await unlockAudio(); // re-unlock on every send gesture (iOS expires context)
   const inp=document.getElementById('msgInput');
   let txt=inp.value.trim();
   if(!wsOk||!txt)return;
