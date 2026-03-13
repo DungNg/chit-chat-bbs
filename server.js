@@ -64,7 +64,48 @@ const server = createServer((req, res) => {
     return;
   }
 
-  // GET /api/online — current online count
+  // GET /admin/download?key=... — tải file chat.db về máy
+  if (url.pathname === '/admin/download') {
+    const key = url.searchParams.get('key') || '';
+    const secret = process.env.RESET_KEY || 'changeme';
+    if (key !== secret) {
+      res.writeHead(403, { 'Content-Type': 'text/plain' });
+      res.end('403 Forbidden');
+      return;
+    }
+    const dbPath = path.join(__dirname, 'chat.db');
+    if (!existsSync(dbPath)) {
+      res.writeHead(404, { 'Content-Type': 'text/plain' });
+      res.end('chat.db not found');
+      return;
+    }
+    const stat = (await import('node:fs')).statSync(dbPath);
+    res.writeHead(200, {
+      'Content-Type': 'application/octet-stream',
+      'Content-Disposition': `attachment; filename="chat-${new Date().toISOString().slice(0,10)}.db"`,
+      'Content-Length': stat.size,
+    });
+    const stream = (await import('node:fs')).createReadStream(dbPath);
+    stream.pipe(res);
+    console.log('[DOWNLOAD] chat.db downloaded by admin');
+    return;
+  }
+  if (url.pathname === '/admin/reset') {
+    const key = url.searchParams.get('key') || '';
+    const secret = process.env.RESET_KEY || 'changeme';
+    if (key !== secret) {
+      res.writeHead(403, { 'Content-Type': 'text/plain' });
+      res.end('403 Forbidden');
+      return;
+    }
+    db.exec('DELETE FROM messages;');
+    const count = db.prepare('SELECT COUNT(*) as c FROM messages').get().c;
+    console.log('[RESET] Messages cleared by admin');
+    broadcast({ type: 'system', text: '*** DATABASE WIPED BY ADMIN ***' });
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end(`OK — messages deleted. Rows remaining: ${count}`);
+    return;
+  }
   if (url.pathname === '/api/online') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ count: uniqueOnlineCount() }));
