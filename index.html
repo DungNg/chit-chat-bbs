@@ -771,42 +771,40 @@ let typClear={},typActive=new Set(),atBottom=true,newCount=0;
 // Auto wss:// on HTTPS (required for Railway / any HTTPS host)
 const WS=`${location.protocol==='https:'?'wss':'ws'}://${location.host}`;
 
-// ── AUDIO (8-bit style) ──
-// Shared AudioContext — browsers require user gesture before audio on HTTPS
+// ── AUDIO (8-bit, iOS/Android compatible) ──
+// iOS rule: AudioContext must be created AND resumed inside a direct user gesture handler.
+// We create it once on first touch/click, then reuse forever.
 let _actx = null;
-function getACtx() {
-  if (!_actx) _actx = new (window.AudioContext || window.webkitAudioContext)();
-  // Resume if suspended (happens on HTTPS until first interaction)
-  if (_actx.state === 'suspended') _actx.resume();
-  return _actx;
-}
-// Unlock audio on first user interaction (click, keydown, touchstart)
-function unlockAudio() {
-  getACtx();
-  document.removeEventListener('click', unlockAudio);
-  document.removeEventListener('keydown', unlockAudio);
-  document.removeEventListener('touchstart', unlockAudio);
-}
-document.addEventListener('click', unlockAudio);
-document.addEventListener('keydown', unlockAudio);
-document.addEventListener('touchstart', unlockAudio);
 
-function beep8(notes){
-  try{
-    const ctx = getACtx();
-    notes.forEach(([f,t,d])=>{
-      const o=ctx.createOscillator(),g=ctx.createGain();
-      o.connect(g);g.connect(ctx.destination);
-      o.type='square';o.frequency.value=f;
-      g.gain.setValueAtTime(.06,ctx.currentTime+t);
-      g.gain.setValueAtTime(.001,ctx.currentTime+t+d);
-      o.start(ctx.currentTime+t);o.stop(ctx.currentTime+t+d+.01);
-    });
-  }catch(_){}
+async function ensureAudio() {
+  try {
+    if (!_actx) {
+      _actx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (_actx.state === 'suspended' || _actx.state === 'interrupted') {
+      await _actx.resume();
+    }
+  } catch(_) {}
 }
-const pNotif=()=>beep8([[880,.0,.05],[1047,.06,.05]]);
-const pJoin=()=>beep8([[262,.0,.08],[330,.09,.08],[392,.18,.08],[523,.27,.12]]);
-const pSend=()=>beep8([[660,.0,.04],[880,.05,.04]]);
+
+function beep8(notes) {
+  if (!_actx || _actx.state !== 'running') return; // not unlocked yet
+  try {
+    notes.forEach(([f, t, d]) => {
+      const o = _actx.createOscillator(), g = _actx.createGain();
+      o.connect(g); g.connect(_actx.destination);
+      o.type = 'square'; o.frequency.value = f;
+      g.gain.setValueAtTime(.06, _actx.currentTime + t);
+      g.gain.setValueAtTime(.001, _actx.currentTime + t + d);
+      o.start(_actx.currentTime + t);
+      o.stop(_actx.currentTime + t + d + .01);
+    });
+  } catch(_) {}
+}
+
+const pNotif = () => beep8([[880,.0,.05],[1047,.06,.05]]);
+const pJoin  = () => beep8([[262,.0,.08],[330,.09,.08],[392,.18,.08],[523,.27,.12]]);
+const pSend  = () => beep8([[660,.0,.04],[880,.05,.04]]);
 
 // ── STORAGE ──
 const saveU=n=>{try{localStorage.setItem('bbs_u',n)}catch(_){}};
@@ -837,7 +835,7 @@ function valNick(n){
   return null;
 }
 
-function enterChat(){
+async function enterChat(){
   const raw=document.getElementById('uInput').value;
   const err=valNick(raw);
   const ee=document.getElementById('loginErr'),ie=document.getElementById('uInput');
@@ -849,11 +847,8 @@ function enterChat(){
   document.getElementById('loginScreen').classList.add('hidden');
   document.getElementById('chatScreen').classList.remove('hidden');
   connectWS();
-  // User just clicked/pressed Enter — guaranteed gesture, unlock audio now
-  if(_actx && _actx.state==='suspended') _actx.resume();
-  else getACtx(); // create + resume
+  await ensureAudio(); // must await inside gesture handler for iOS
   pJoin();
-  // system line
   addSys(`CONNECTED AS [${user}] — WELCOME TO CHIT-CHAT BBS`);
 }
 
@@ -889,7 +884,8 @@ function onMsg(m){
   }
 }
 
-function doSend(){
+async function doSend(){
+  await ensureAudio(); // each send is a gesture — keep context alive on iOS
   const inp=document.getElementById('msgInput');
   let txt=inp.value.trim();
   if(!wsOk||!txt)return;
