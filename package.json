@@ -1,0 +1,16 @@
+{
+  "name": "private-chat",
+  "version": "1.0.0",
+  "description": "Anonymous real-time chat. Zero npm dependencies.",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node --experimental-sqlite server.js",
+    "dev": "node --experimental-sqlite --watch server.js"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "keywords": ["chat", "websocket", "anonymous", "privacy"],
+  "license": "MIT"
+}

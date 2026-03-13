@@ -1,0 +1,1192 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>★ CHIT-CHAT BBS★</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=VT323&family=Press+Start+2P&family=Share+Tech+Mono&display=swap');
+
+    :root {
+      --bg: #0a0a0f;
+      --scanline: rgba(0, 0, 0, 0.35);
+      --green: #39ff14;
+      --green-dim: #1a7a0a;
+      --green-pale: #0d3305;
+      --amber: #ffb000;
+      --amber-dim: #7a5000;
+      --cyan: #00e5ff;
+      --magenta: #ff00aa;
+      --white: #e8ffe8;
+      --border: #39ff14;
+      --crt-glow: 0 0 10px #39ff14, 0 0 20px #39ff1430;
+      --crt-glow-amber: 0 0 10px #ffb000, 0 0 20px #ffb00030;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'VT323', monospace;
+      background: var(--bg);
+      color: var(--green);
+      height: 100vh;
+      overflow: hidden;
+      cursor: default;
+      position: relative;
+    }
+
+    /* CRT phosphor effect */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(0deg,
+          transparent 0px,
+          transparent 3px,
+          var(--scanline) 3px,
+          var(--scanline) 4px);
+      pointer-events: none;
+      z-index: 9999;
+      animation: scanRoll 8s linear infinite;
+    }
+
+    @keyframes scanRoll {
+      0% {
+        background-position: 0 0;
+      }
+
+      100% {
+        background-position: 0 200px;
+      }
+    }
+
+    /* CRT vignette */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(ellipse at center, transparent 60%, rgba(0, 0, 0, 0.7) 100%);
+      pointer-events: none;
+      z-index: 9998;
+    }
+
+    /* ── SCREENS ── */
+    .screen {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: opacity .3s;
+    }
+
+    .screen.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    /* ── BOOT SCREEN ── */
+    .boot-text {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 13px;
+      color: var(--green);
+      max-width: 600px;
+      line-height: 1.6;
+      padding: 40px;
+    }
+
+    /* ── LOGIN ── */
+    .terminal-box {
+      width: 560px;
+      border: 2px solid var(--green);
+      position: relative;
+      background: var(--bg);
+      box-shadow: var(--crt-glow), inset 0 0 40px rgba(57, 255, 20, .04);
+      animation: flicker 6s infinite;
+    }
+
+    @keyframes flicker {
+
+      0%,
+      96%,
+      100% {
+        opacity: 1;
+      }
+
+      97% {
+        opacity: .92;
+      }
+
+      98% {
+        opacity: 1;
+      }
+
+      99% {
+        opacity: .96;
+      }
+    }
+
+    .tb-title-bar {
+      background: var(--green);
+      color: var(--bg);
+      font-family: 'Press Start 2P', monospace;
+      font-size: 8px;
+      padding: 6px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      letter-spacing: .05em;
+    }
+
+    .tb-dots {
+      display: flex;
+      gap: 6px;
+    }
+
+    .tb-dot {
+      width: 10px;
+      height: 10px;
+      background: var(--bg);
+      border: 1px solid var(--bg);
+      font-size: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: monospace;
+    }
+
+    .tb-body {
+      padding: 28px 32px;
+    }
+
+    .ascii-logo {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      color: var(--green);
+      line-height: 1.2;
+      margin-bottom: 20px;
+      text-shadow: var(--crt-glow);
+      white-space: pre;
+    }
+
+    .tb-label {
+      font-size: 18px;
+      color: var(--amber);
+      margin-bottom: 6px;
+      letter-spacing: .1em;
+    }
+
+    .tb-input-row {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      border: 1px solid var(--green);
+      background: var(--green-pale);
+      margin-bottom: 18px;
+    }
+
+    .tb-prompt {
+      font-size: 20px;
+      color: var(--green);
+      padding: 8px 10px;
+      flex-shrink: 0;
+      text-shadow: var(--crt-glow);
+    }
+
+    .tb-input {
+      flex: 1;
+      background: none;
+      border: none;
+      outline: none;
+      font-family: 'VT323', monospace;
+      font-size: 22px;
+      color: var(--green);
+      padding: 6px 4px;
+      text-shadow: var(--crt-glow);
+      caret-color: var(--green);
+    }
+
+    .tb-input::placeholder {
+      color: var(--green-dim);
+    }
+
+    .tb-input.err {
+      color: var(--magenta);
+      border-color: var(--magenta);
+    }
+
+    .err-line {
+      font-size: 16px;
+      color: var(--magenta);
+      margin-top: -12px;
+      margin-bottom: 14px;
+      display: none;
+    }
+
+    .tb-btn {
+      width: 100%;
+      background: none;
+      border: 2px solid var(--green);
+      color: var(--green);
+      font-family: 'Press Start 2P', monospace;
+      font-size: 9px;
+      padding: 12px;
+      cursor: pointer;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      transition: all .1s;
+      text-shadow: var(--crt-glow);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .tb-btn::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: var(--green);
+      transform: translateX(-100%);
+      transition: transform .15s;
+      z-index: 0;
+    }
+
+    .tb-btn:hover::before {
+      transform: translateX(0);
+    }
+
+    .tb-btn:hover {
+      color: var(--bg);
+      text-shadow: none;
+    }
+
+    .tb-btn span {
+      position: relative;
+      z-index: 1;
+    }
+
+    .sys-info {
+      margin-top: 20px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      color: var(--green-dim);
+      line-height: 1.8;
+      border-top: 1px dashed var(--green-dim);
+      padding-top: 14px;
+    }
+
+    .sys-info span {
+      color: var(--amber);
+    }
+
+    /* ── CHAT ── */
+    .chat-layout {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      width: 100%;
+    }
+
+    /* Status bar top */
+    .status-bar {
+      background: var(--green);
+      color: var(--bg);
+      font-family: 'Press Start 2P', monospace;
+      font-size: 7px;
+      padding: 5px 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-shrink: 0;
+      letter-spacing: .05em;
+    }
+
+    .status-left {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .status-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .blink {
+      animation: blink 1s step-end infinite;
+    }
+
+    @keyframes blink {
+
+      0%,
+      100% {
+        opacity: 1
+      }
+
+      50% {
+        opacity: 0
+      }
+    }
+
+    /* Chat header */
+    .chat-header {
+      border-bottom: 2px solid var(--green);
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+      background: var(--bg);
+      box-shadow: 0 2px 0 var(--green-dim);
+    }
+
+    .ch-left {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .ch-logo {
+      font-family: 'Press Start 2P', monospace;
+      font-size: 9px;
+      color: var(--green);
+      text-shadow: var(--crt-glow);
+      letter-spacing: .08em;
+    }
+
+    .ch-channel {
+      font-size: 18px;
+      color: var(--amber);
+      letter-spacing: .1em;
+    }
+
+    .online-badge {
+      font-size: 16px;
+      color: var(--cyan);
+      border: 1px solid var(--cyan);
+      padding: 2px 10px;
+      text-shadow: 0 0 8px var(--cyan);
+      letter-spacing: .1em;
+    }
+
+    .ch-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .user-tag {
+      font-size: 18px;
+      color: var(--amber);
+      letter-spacing: .08em;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .user-tag span {
+      color: var(--green);
+    }
+
+    .btn-retro {
+      background: none;
+      border: 1px solid var(--amber);
+      color: var(--amber);
+      font-family: 'VT323', monospace;
+      font-size: 16px;
+      padding: 3px 10px;
+      cursor: pointer;
+      letter-spacing: .08em;
+      transition: all .1s;
+      text-shadow: var(--crt-glow-amber);
+    }
+
+    .btn-retro:hover {
+      background: var(--amber);
+      color: var(--bg);
+      text-shadow: none;
+    }
+
+    /* Conn banner */
+    .conn-banner {
+      background: var(--magenta);
+      color: white;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 7px;
+      text-align: center;
+      padding: 5px;
+      display: none;
+      letter-spacing: .1em;
+      flex-shrink: 0;
+      animation: blink 1s step-end infinite;
+    }
+
+    .conn-banner.show {
+      display: block;
+    }
+
+    /* Messages */
+    .msgs-wrap {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      scroll-behavior: smooth;
+      background: linear-gradient(rgba(57, 255, 20, .02) 1px, transparent 1px);
+      background-size: 100% 22px;
+    }
+
+    .msgs-wrap::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .msgs-wrap::-webkit-scrollbar-track {
+      background: var(--green-pale);
+      border-left: 1px solid var(--green-dim);
+    }
+
+    .msgs-wrap::-webkit-scrollbar-thumb {
+      background: var(--green-dim);
+    }
+
+    .msgs-wrap::-webkit-scrollbar-thumb:hover {
+      background: var(--green);
+    }
+
+    /* System line */
+    .msg-sys {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 12px;
+      color: var(--green-dim);
+      padding: 4px 0;
+      border-top: 1px dashed var(--green-pale);
+      border-bottom: 1px dashed var(--green-pale);
+      margin: 4px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .msg-sys::before {
+      content: '***';
+      color: var(--cyan);
+      flex-shrink: 0;
+    }
+
+    /* Chat line */
+    .msg-line {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 13px;
+      line-height: 1.5;
+      padding: 1px 0;
+      display: flex;
+      gap: 0;
+      animation: lineIn .15s ease;
+      align-items: baseline;
+    }
+
+    @keyframes lineIn {
+      from {
+        opacity: 0;
+        transform: translateX(-6px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    .msg-ts {
+      color: var(--green-dim);
+      flex-shrink: 0;
+      margin-right: 4px;
+      font-size: 12px;
+    }
+
+    .msg-nick {
+      flex-shrink: 0;
+      font-weight: bold;
+      letter-spacing: .02em;
+    }
+
+    .msg-nick-wrap {
+      flex-shrink: 0;
+      display: flex;
+      align-items: baseline;
+    }
+
+    .msg-nick-l {
+      color: var(--green-dim);
+    }
+
+    .msg-nick-r {
+      color: var(--green-dim);
+    }
+
+    .msg-sep {
+      color: var(--green-dim);
+      flex-shrink: 0;
+      margin: 0 4px;
+    }
+
+    .msg-text {
+      color: var(--white);
+      word-break: break-word;
+      flex: 1;
+    }
+
+    .msg-line.own .msg-nick {
+      color: var(--amber);
+      text-shadow: var(--crt-glow-amber);
+    }
+
+    .msg-line.own .msg-text {
+      color: var(--amber);
+    }
+
+    .msg-line.other .msg-nick {
+      color: var(--cyan);
+      text-shadow: 0 0 8px var(--cyan);
+    }
+
+    /* Typing */
+    .typing-bar {
+      padding: 4px 16px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 12px;
+      color: var(--green-dim);
+      min-height: 22px;
+      flex-shrink: 0;
+      border-top: 1px dashed var(--green-pale);
+    }
+
+    .cursor-blink {
+      animation: blink .7s step-end infinite;
+      color: var(--green);
+    }
+
+    /* Input */
+    .input-area {
+      border-top: 2px solid var(--green);
+      background: var(--green-pale);
+      flex-shrink: 0;
+    }
+
+    .input-row {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      padding: 0 0 0 0;
+    }
+
+    .input-prompt {
+      font-size: 22px;
+      color: var(--green);
+      padding: 8px 12px;
+      flex-shrink: 0;
+      text-shadow: var(--crt-glow);
+      border-right: 1px solid var(--green-dim);
+      font-family: 'Share Tech Mono', monospace;
+    }
+
+    .input-nick {
+      font-size: 18px;
+      color: var(--amber);
+      padding: 8px 8px 8px 10px;
+      flex-shrink: 0;
+      font-family: 'Share Tech Mono', monospace;
+      text-shadow: var(--crt-glow-amber);
+    }
+
+    .chat-input {
+      flex: 1;
+      background: none;
+      border: none;
+      outline: none;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 18px;
+      color: var(--green);
+      padding: 8px 4px;
+      text-shadow: var(--crt-glow);
+      caret-color: var(--green);
+    }
+
+    .chat-input::placeholder {
+      color: var(--green-dim);
+    }
+
+    .chat-input:disabled {
+      opacity: .4;
+    }
+
+    .btn-transmit {
+      background: var(--green);
+      border: none;
+      color: var(--bg);
+      font-family: 'Press Start 2P', monospace;
+      font-size: 7px;
+      padding: 0 16px;
+      height: 100%;
+      cursor: pointer;
+      letter-spacing: .1em;
+      transition: background .1s;
+      flex-shrink: 0;
+      align-self: stretch;
+      display: flex;
+      align-items: center;
+    }
+
+    .btn-transmit:hover {
+      background: #5fff38;
+    }
+
+    .btn-transmit:active {
+      background: var(--amber);
+    }
+
+    .btn-transmit:disabled {
+      opacity: .4;
+      cursor: not-allowed;
+    }
+
+    .input-hint {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      color: var(--green-dim);
+      padding: 4px 16px 6px;
+      letter-spacing: .05em;
+    }
+
+    /* New msg badge */
+    .new-badge {
+      position: fixed;
+      bottom: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--magenta);
+      color: white;
+      font-family: 'Press Start 2P', monospace;
+      font-size: 7px;
+      padding: 8px 16px;
+      cursor: pointer;
+      letter-spacing: .1em;
+      animation: lineIn .2s ease;
+      z-index: 100;
+      border: 2px solid white;
+      text-shadow: none;
+    }
+
+    /* ── MODAL ── */
+    .modal-bg {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, .85);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .2s;
+    }
+
+    .modal-bg.show {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    .modal-box {
+      width: 440px;
+      border: 2px solid var(--amber);
+      background: var(--bg);
+      box-shadow: var(--crt-glow-amber);
+      animation: flicker 6s infinite;
+    }
+
+    .modal-tb {
+      background: var(--amber);
+      color: var(--bg);
+      font-family: 'Press Start 2P', monospace;
+      font-size: 7px;
+      padding: 6px 12px;
+      letter-spacing: .05em;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .modal-body {
+      padding: 24px 28px;
+    }
+
+    .modal-title {
+      font-size: 22px;
+      color: var(--amber);
+      margin-bottom: 16px;
+      letter-spacing: .1em;
+      text-shadow: var(--crt-glow-amber);
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .btn-modal-cancel {
+      flex: 1;
+      background: none;
+      border: 1px solid var(--green-dim);
+      color: var(--green-dim);
+      font-family: 'VT323', monospace;
+      font-size: 18px;
+      padding: 8px;
+      cursor: pointer;
+      letter-spacing: .1em;
+      transition: all .1s;
+    }
+
+    .btn-modal-cancel:hover {
+      border-color: var(--magenta);
+      color: var(--magenta);
+    }
+
+    .btn-modal-ok {
+      flex: 1;
+      background: var(--amber);
+      border: none;
+      color: var(--bg);
+      font-family: 'Press Start 2P', monospace;
+      font-size: 8px;
+      padding: 10px;
+      cursor: pointer;
+      letter-spacing: .1em;
+      transition: all .1s;
+    }
+
+    .btn-modal-ok:hover {
+      background: #ffc740;
+    }
+
+    /* ── TOAST ── */
+    .toast-wrap {
+      position: fixed;
+      top: 40px;
+      right: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      z-index: 2000;
+    }
+
+    .toast {
+      background: var(--bg);
+      border: 1px solid var(--green);
+      color: var(--green);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 12px;
+      padding: 8px 14px;
+      min-width: 200px;
+      text-shadow: var(--crt-glow);
+      animation: lineIn .2s ease;
+      box-shadow: var(--crt-glow);
+    }
+
+    /* Pixel corner decorations */
+    .px-corner {
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      background: var(--bg);
+      border: 2px solid var(--green);
+    }
+
+    .px-tl {
+      top: -2px;
+      left: -2px;
+    }
+
+    .px-tr {
+      top: -2px;
+      right: -2px;
+    }
+
+    .px-bl {
+      bottom: -2px;
+      left: -2px;
+    }
+
+    .px-br {
+      bottom: -2px;
+      right: -2px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- LOGIN -->
+  <div class="screen" id="loginScreen">
+    <div class="terminal-box">
+      <div class="tb-title-bar">
+        <span>CHIT-CHAT BBS v2.4 — ANONYMOUS NODE</span>
+        <div class="tb-dots">
+          <div class="tb-dot">■</div>
+          <div class="tb-dot">□</div>
+          <div class="tb-dot">▣</div>
+        </div>
+      </div>
+      <div class="tb-body">
+        <pre class="ascii-logo">  ██████╗██╗  ██╗██╗████████╗      ██████╗██╗  ██╗ █████╗ ████████╗
+ ██╔════╝██║  ██║██║╚══██╔══╝     ██╔════╝██║  ██║██╔══██╗╚══██╔══╝
+ ██║     ███████║██║   ██║        ██║     ███████║███████║   ██║
+ ██╚════╝██╔══██║██║   ██║        ██╚════╝██╔══██║██╔══██║   ██║
+  ██████╗██║  ██║██║   ██║         ██████╗██║  ██║██║  ██║   ██║
+  ╚═════╝╚═╝  ╚═╝╚═╝   ╚═╝         ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝</pre>
+
+        <div class="tb-label">► ENTER HANDLE:</div>
+        <div class="tb-input-row">
+          <span class="tb-prompt">C:\&gt;</span>
+          <input class="tb-input" id="uInput" type="text" placeholder="YOUR_ALIAS_HERE" maxlength="20"
+            autocomplete="off" spellcheck="false" />
+        </div>
+        <div class="err-line" id="loginErr"></div>
+
+        <button class="tb-btn" onclick="enterChat()"><span>[ CONNECT TO BBS ]</span></button>
+
+        <div class="sys-info">
+          SYSTEM INFO:<br>
+          &gt; NO IP LOGGING . . . . . . <span>OK</span><br>
+          &gt; NO SERVER-SIDE COOKIES . . <span>OK</span><br>
+          &gt; ALIAS STORED LOCAL ONLY . . <span>OK</span><br>
+          &gt; END-TO-END ANONYMOUS . . . <span>ENABLED</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CHAT -->
+  <div class="screen hidden" id="chatScreen">
+    <div class="chat-layout">
+
+      <div class="status-bar">
+        <div class="status-left">
+          <span>★ CHIT-CHAT BBS ★</span>
+          <span>NODE: #ANON-01</span>
+          <span id="clockStr">--:--:--</span>
+        </div>
+        <div class="status-right">
+          <span>USERS: <strong id="onlineCount">—</strong></span>
+          <span class="blink">●</span>
+          <span>ONLINE</span>
+        </div>
+      </div>
+
+      <div class="conn-banner" id="connBanner">*** CARRIER LOST — RECONNECTING... ***</div>
+
+      <div class="chat-header">
+        <div class="ch-left">
+          <div class="ch-logo">CHIT-CHAT</div>
+          <div class="ch-channel">#GENERAL</div>
+          <div class="online-badge" id="onlineBadge">[ <span id="onlineCount2">—</span> USERS ]</div>
+        </div>
+        <div class="ch-right">
+          <div class="user-tag">NICK: <span id="headerUser">—</span></div>
+          <button class="btn-retro" onclick="openRename()">[ RENAME ]</button>
+        </div>
+      </div>
+
+      <div class="msgs-wrap" id="msgsList"></div>
+
+      <div class="typing-bar" id="typBar"></div>
+
+      <div class="input-area">
+        <div class="input-row">
+          <div class="input-prompt">»</div>
+          <div class="input-nick" id="inputNick">ANON</div>
+          <div style="color:var(--green-dim);padding:8px 2px;font-family:'Share Tech Mono',monospace">:</div>
+          <input class="chat-input" id="msgInput" type="text" placeholder="TYPE MESSAGE, HIT ENTER TO TRANSMIT..."
+            maxlength="500" autocomplete="off" spellcheck="false" />
+          <button class="btn-transmit" id="sendBtn" onclick="doSend()">SEND</button>
+        </div>
+        <div class="input-hint">&gt; ENTER = SEND &nbsp;|&nbsp; /nick NEW_NAME = RENAME &nbsp;|&nbsp; ZERO LOGS
+          &nbsp;|&nbsp; STAY ANON</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- RENAME MODAL -->
+  <div class="modal-bg" id="rModal">
+    <div class="modal-box">
+      <div class="modal-tb">
+        <span>CHANGE HANDLE</span>
+        <span>★ CHIT-CHAT BBS ★</span>
+      </div>
+      <div class="modal-body">
+        <div class="modal-title">► NEW HANDLE:</div>
+        <div class="tb-input-row">
+          <span class="tb-prompt">C:\&gt;</span>
+          <input class="tb-input" id="rInput" type="text" placeholder="NEW_ALIAS" maxlength="20" autocomplete="off"
+            spellcheck="false" />
+        </div>
+        <div class="err-line" id="rErr"></div>
+        <div class="modal-actions">
+          <button class="btn-modal-cancel" onclick="closeRename()">[ CANCEL ]</button>
+          <button class="btn-modal-ok" onclick="confirmRename()">CONFIRM</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-wrap" id="toastWrap"></div>
+
+  <script>
+    // ── CLOCK ──
+    function tickClock() {
+      const now = new Date();
+      const s = t => String(t).padStart(2, '0');
+      const str = `${s(now.getHours())}:${s(now.getMinutes())}:${s(now.getSeconds())}`;
+      const el = document.getElementById('clockStr');
+      if (el) el.textContent = str;
+    }
+    setInterval(tickClock, 1000); tickClock();
+
+    // ── COLOR per nick ──
+    const NICK_COLORS = ['#00e5ff', '#ff00aa', '#39ff14', '#ffb000', '#ff6e27', '#b967ff', '#01ffc3'];
+    function nickColor(n) { let h = 0; for (const c of n) h = (h * 31 + c.charCodeAt(0)) & 0xffff; return NICK_COLORS[h % NICK_COLORS.length] }
+
+    const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const fmt = d => d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+    let user = '', ws = null, wsOk = false, rcTimer = null, typTimer = null;
+    let typClear = {}, typActive = new Set(), atBottom = true, newCount = 0;
+    const WS = `ws://${location.host}`;
+
+    // ── AUDIO (8-bit style) ──
+    function beep8(notes) {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        notes.forEach(([f, t, d]) => {
+          const o = ctx.createOscillator(), g = ctx.createGain();
+          o.connect(g); g.connect(ctx.destination);
+          o.type = 'square'; o.frequency.value = f;
+          g.gain.setValueAtTime(.06, ctx.currentTime + t);
+          g.gain.setValueAtTime(.001, ctx.currentTime + t + d);
+          o.start(ctx.currentTime + t); o.stop(ctx.currentTime + t + d + .01);
+        });
+      } catch (_) { }
+    }
+    const pNotif = () => beep8([[880, .0, .05], [1047, .06, .05]]);
+    const pJoin = () => beep8([[262, .0, .08], [330, .09, .08], [392, .18, .08], [523, .27, .12]]);
+    const pSend = () => beep8([[660, .0, .04], [880, .05, .04]]);
+
+    // ── STORAGE ──
+    const saveU = n => { try { localStorage.setItem('bbs_u', n) } catch (_) { } };
+    const loadU = () => { try { return localStorage.getItem('bbs_u') || '' } catch (_) { return '' } };
+
+    window.onload = () => {
+      const sv = loadU(); if (sv) document.getElementById('uInput').value = sv;
+      document.getElementById('uInput').addEventListener('keydown', e => { if (e.key === 'Enter') enterChat() });
+      document.getElementById('msgInput').addEventListener('keydown', e => {
+        if (e.key === 'Enter') { doSend(); return }
+        const v = document.getElementById('msgInput').value;
+        if (v.startsWith('/nick ')) {/* handle slash cmd */ }
+      });
+      document.getElementById('msgInput').addEventListener('input', onType);
+      document.getElementById('rInput').addEventListener('keydown', e => { if (e.key === 'Enter') confirmRename() });
+      document.getElementById('rModal').addEventListener('click', e => { if (e.target.id === 'rModal') closeRename() });
+      document.getElementById('msgsList').addEventListener('scroll', function () {
+        atBottom = this.scrollTop + this.clientHeight >= this.scrollHeight - 80;
+        if (atBottom) { newCount = 0; rmBadge() }
+      });
+    };
+
+    function valNick(n) {
+      n = n.trim();
+      if (!n) return 'ERROR: HANDLE CANNOT BE EMPTY';
+      if (n.length < 2) return 'ERROR: MIN 2 CHARS REQUIRED';
+      if (!/^[\w.\-]+$/.test(n)) return 'ERROR: ALPHANUMERIC, _ . - ONLY';
+      return null;
+    }
+
+    function enterChat() {
+      const raw = document.getElementById('uInput').value;
+      const err = valNick(raw);
+      const ee = document.getElementById('loginErr'), ie = document.getElementById('uInput');
+      if (err) { ee.textContent = err; ee.style.display = 'block'; ie.classList.add('err'); return }
+      ee.style.display = 'none'; ie.classList.remove('err');
+      user = raw.trim().toUpperCase(); saveU(user);
+      document.getElementById('headerUser').textContent = user;
+      document.getElementById('inputNick').textContent = user;
+      document.getElementById('loginScreen').classList.add('hidden');
+      document.getElementById('chatScreen').classList.remove('hidden');
+      connectWS(); pJoin();
+      // system line
+      addSys(`CONNECTED AS [${user}] — WELCOME TO CHIT-CHAT BBS`);
+    }
+
+    function connectWS() {
+      if (ws) { try { ws.close() } catch (_) { } }
+      ws = new WebSocket(WS);
+      ws.addEventListener('open', () => {
+        wsOk = true; setConn(true);
+        ws.send(JSON.stringify({ type: 'join', username: user }));
+        if (rcTimer) { clearTimeout(rcTimer); rcTimer = null }
+      });
+      ws.addEventListener('message', e => { let m; try { m = JSON.parse(e.data) } catch { return } onMsg(m) });
+      ws.addEventListener('close', () => { wsOk = false; setConn(false); schedRC() });
+      ws.addEventListener('error', () => { wsOk = false; setConn(false) });
+    }
+    function schedRC() { if (rcTimer) return; rcTimer = setTimeout(() => { rcTimer = null; connectWS() }, 3000) }
+    function setConn(ok) {
+      document.getElementById('connBanner').classList.toggle('show', !ok);
+      document.getElementById('msgInput').disabled = !ok;
+      document.getElementById('sendBtn').disabled = !ok;
+    }
+
+    function onMsg(m) {
+      switch (m.type) {
+        case 'history': m.messages.forEach(x => addMsg({ u: x.username, txt: x.message, d: new Date(x.createdDate), own: x.username === user, skip: true })); scrollBot(); break;
+        case 'message': addMsg({ u: m.username, txt: m.message, d: new Date(m.createdDate), own: m.username === user }); clrTypFor(m.username); break;
+        case 'system': addSys(m.text.toUpperCase()); break;
+        case 'online':
+          document.getElementById('onlineCount').textContent = m.count;
+          document.getElementById('onlineCount2').textContent = m.count;
+          break;
+        case 'typing': showTypFor(m.username); break;
+      }
+    }
+
+    function doSend() {
+      const inp = document.getElementById('msgInput');
+      let txt = inp.value.trim();
+      if (!wsOk || !txt) return;
+
+      // slash command /nick
+      if (txt.startsWith('/nick ')) {
+        const nn = txt.slice(6).trim().toUpperCase();
+        inp.value = '';
+        if (nn && nn !== user) {
+          const err = valNick(nn);
+          if (err) { addSys(err); return }
+          const old = user; user = nn; saveU(nn);
+          document.getElementById('headerUser').textContent = nn;
+          document.getElementById('inputNick').textContent = nn;
+          if (wsOk) ws.send(JSON.stringify({ type: 'rename', newName: nn }));
+          toast(`HANDLE CHANGED: ${old} → ${nn}`);
+        }
+        return;
+      }
+
+      inp.value = '';
+      ws.send(JSON.stringify({ type: 'message', message: txt }));
+      pSend();
+    }
+
+    function onType() {
+      if (!wsOk || typTimer) return;
+      ws.send(JSON.stringify({ type: 'typing' }));
+      typTimer = setTimeout(() => { typTimer = null }, 2000);
+    }
+
+    function showTypFor(u) { typActive.add(u); renderTyp(); if (typClear[u]) clearTimeout(typClear[u]); typClear[u] = setTimeout(() => clrTypFor(u), 3000) }
+    function clrTypFor(u) { typActive.delete(u); delete typClear[u]; renderTyp() }
+    function renderTyp() {
+      const el = document.getElementById('typBar');
+      const oth = [...typActive].filter(u => u !== user);
+      if (!oth.length) { el.innerHTML = ''; return }
+      el.innerHTML = `&gt; <span style="color:var(--cyan)">${esc(oth[0].toUpperCase())}</span> IS TYPING<span class="blink">_</span>`;
+    }
+
+    function openRename() {
+      document.getElementById('rInput').value = user;
+      document.getElementById('rErr').style.display = 'none';
+      document.getElementById('rInput').classList.remove('err');
+      document.getElementById('rModal').classList.add('show');
+      setTimeout(() => document.getElementById('rInput').focus(), 100);
+    }
+    function closeRename() { document.getElementById('rModal').classList.remove('show') }
+    function confirmRename() {
+      const raw = document.getElementById('rInput').value;
+      const err = valNick(raw);
+      const ee = document.getElementById('rErr'), ie = document.getElementById('rInput');
+      if (err) { ee.textContent = err; ee.style.display = 'block'; ie.classList.add('err'); return }
+      const nn = raw.trim().toUpperCase();
+      if (nn === user) { closeRename(); return }
+      const old = user; user = nn; saveU(nn);
+      document.getElementById('headerUser').textContent = nn;
+      document.getElementById('inputNick').textContent = nn;
+      if (wsOk) ws.send(JSON.stringify({ type: 'rename', newName: nn }));
+      toast(`HANDLE CHANGED: ${old} → ${nn}`);
+      closeRename();
+    }
+
+    function addSys(text) {
+      const list = document.getElementById('msgsList');
+      const d = document.createElement('div'); d.className = 'msg-sys';
+      d.innerHTML = ` ${esc(text)}`;
+      list.appendChild(d);
+      if (atBottom) scrollBot();
+    }
+
+    function addMsg({ u, txt, d, own, skip = false }) {
+      const list = document.getElementById('msgsList');
+      const color = nickColor(u);
+      const row = document.createElement('div');
+      row.className = `msg-line ${own ? 'own' : 'other'}`;
+
+      const ts = document.createElement('span'); ts.className = 'msg-ts'; ts.textContent = `[${fmt(d)}] `;
+
+      const nickWrap = document.createElement('span'); nickWrap.className = 'msg-nick-wrap';
+      const nl = document.createElement('span'); nl.className = 'msg-nick-l'; nl.textContent = '<';
+      const nm = document.createElement('span'); nm.className = 'msg-nick';
+      nm.style.color = own ? 'var(--amber)' : color;
+      nm.style.textShadow = own ? 'var(--crt-glow-amber)' : `0 0 8px ${color}`;
+      nm.textContent = u.toUpperCase();
+      const nr = document.createElement('span'); nr.className = 'msg-nick-r'; nr.textContent = '>';
+      nickWrap.appendChild(nl); nickWrap.appendChild(nm); nickWrap.appendChild(nr);
+
+      const sep = document.createElement('span'); sep.className = 'msg-sep'; sep.textContent = ' ';
+
+      const msgEl = document.createElement('span'); msgEl.className = 'msg-text';
+      if (own) msgEl.style.color = 'var(--amber)';
+      msgEl.textContent = txt;
+
+      row.appendChild(ts); row.appendChild(nickWrap); row.appendChild(sep); row.appendChild(msgEl);
+      list.appendChild(row);
+
+      if (own || atBottom) scrollBot(true);
+      else if (!skip) { newCount++; showBadge(); if (!own) pNotif() }
+    }
+
+    function scrollBot(sm = false) {
+      const l = document.getElementById('msgsList');
+      l.scrollTo({ top: l.scrollHeight, behavior: sm ? 'smooth' : 'auto' });
+      atBottom = true;
+    }
+    function showBadge() {
+      rmBadge();
+      const b = document.createElement('div'); b.className = 'new-badge'; b.id = 'nb';
+      b.textContent = `▼ ${newCount} NEW MSG — CLICK TO SCROLL ▼`;
+      b.onclick = () => { scrollBot(true); rmBadge() };
+      document.body.appendChild(b);
+    }
+    function rmBadge() { const b = document.getElementById('nb'); if (b) b.remove() }
+    function toast(msg, ms = 3000) {
+      const w = document.getElementById('toastWrap');
+      const t = document.createElement('div'); t.className = 'toast';
+      t.textContent = '> ' + msg; w.appendChild(t);
+      setTimeout(() => { t.style.transition = 'opacity .3s'; t.style.opacity = '0'; setTimeout(() => t.remove(), 300) }, ms);
+    }
+  </script>
+</body>
+
+</html>
