@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content">
 <title>★ CHIT-CHAT BBS ★</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=VT323&family=Press+Start+2P&family=Share+Tech+Mono&display=swap');
@@ -30,6 +30,7 @@ body {
   background: var(--bg);
   color: var(--green);
   height: 100vh;
+  height: 100dvh; /* mobile: excludes browser chrome */
   overflow: hidden;
   cursor: default;
   position: relative;
@@ -217,7 +218,7 @@ body::after {
 .sys-info span { color: var(--amber); }
 
 /* ── CHAT ── */
-.chat-layout { display: flex; flex-direction: column; height: 100vh; width: 100%; }
+.chat-layout { display: flex; flex-direction: column; height: 100vh; height: 100dvh; width: 100%; }
 
 /* Status bar top */
 .status-bar {
@@ -601,8 +602,8 @@ body::after {
   /* Typing bar */
   .typing-bar { padding: 3px 10px; font-size: 11px; }
 
-  /* Input area */
-  .input-area {}
+  /* Input area — stick to bottom, never hidden */
+  .input-area { flex-shrink: 0; position: sticky; bottom: 0; }
   .input-row { flex-wrap: nowrap; }
   .input-prompt { padding: 7px 8px; font-size: 18px; }
   .input-nick { font-size: 14px; padding: 7px 6px; }
