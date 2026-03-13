@@ -67,7 +67,7 @@ const server = createServer((req, res) => {
   // GET /api/online — current online count
   if (url.pathname === '/api/online') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ count: clients.size }));
+    res.end(JSON.stringify({ count: uniqueOnlineCount() }));
     return;
   }
 
@@ -175,8 +175,16 @@ function sendTo(socket, data) {
   try { socket.write(encodeFrame(JSON.stringify(data))); } catch(_) {}
 }
 
+function uniqueOnlineCount() {
+  const names = new Set();
+  for (const [, client] of clients) {
+    if (client.username) names.add(client.username.toLowerCase());
+  }
+  return names.size;
+}
+
 function broadcastOnlineCount() {
-  broadcast({ type: 'online', count: clients.size });
+  broadcast({ type: 'online', count: uniqueOnlineCount() });
 }
 
 server.on('upgrade', (req, socket, head) => {
@@ -229,7 +237,7 @@ server.on('upgrade', (req, socket, head) => {
         // Notify everyone else
         broadcast({ type: 'system', text: `${username} joined` }, socket);
         broadcastOnlineCount();
-        sendTo(socket, { type: 'online', count: clients.size });
+        sendTo(socket, { type: 'online', count: uniqueOnlineCount() });
         console.log(`[JOIN] ${username}`);
       }
 
