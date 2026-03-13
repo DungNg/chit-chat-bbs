@@ -9,10 +9,39 @@
  */
 
 import { createServer } from 'node:http';
+import https from 'node:https';
 import { readFileSync, existsSync, statSync, createReadStream } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+// ─────────────────────────────────────────────
+// DISCORD WEBHOOK
+// Set env: DISCORD_WEBHOOK = https://discord.com/api/webhooks/xxx/yyy
+// ─────────────────────────────────────────────
+const DISCORD_WEBHOOK = process.env.DISCORD_WEBHOOK || '';
+
+function notifyDiscord(username) {
+  if (!DISCORD_WEBHOOK) return;
+  try {
+    const body = JSON.stringify({
+      content: `👤 **${username}** vừa tham gia **CHIT-CHAT BBS**`,
+    });
+    const url = new URL(DISCORD_WEBHOOK);
+    const req = https.request({
+      hostname: url.hostname,
+      path: url.pathname + url.search,
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
+    }, res => res.resume());
+    req.on('error', err => console.error('[DISCORD] Failed:', err.message));
+    req.write(body);
+    req.end();
+    console.log(`[DISCORD] Notified: ${username} joined`);
+  } catch (err) {
+    console.error('[DISCORD] Failed:', err.message);
+  }
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3000;
@@ -22,11 +51,11 @@ const PORT = process.env.PORT || 3000;
 // ─────────────────────────────────────────────
 // Railway persistent volume mounts tại /data (set DB_DIR=/data trong Railway Variables)
 // Local dev: lưu vào ./data/
-const DB_DIR = process.env.DB_DIR || path.join(__dirname, 'data');
+const DB_DIR  = process.env.DB_DIR || path.join(__dirname, 'data');
 const DB_PATH = path.join(DB_DIR, 'chat.db');
 
 import { mkdirSync } from 'node:fs';
-try { mkdirSync(DB_DIR, { recursive: true }); } catch (_) { }
+try { mkdirSync(DB_DIR, { recursive: true }); } catch(_) {}
 
 console.log(`  → DB path: ${DB_PATH}`);
 const db = new DatabaseSync(DB_PATH);
@@ -92,7 +121,7 @@ const server = createServer((req, res) => {
     const stat = statSync(dbPath);
     res.writeHead(200, {
       'Content-Type': 'application/octet-stream',
-      'Content-Disposition': `attachment; filename="chat-${new Date().toISOString().slice(0, 10)}.db"`,
+      'Content-Disposition': `attachment; filename="chat-${new Date().toISOString().slice(0,10)}.db"`,
       'Content-Length': stat.size,
     });
     const stream = createReadStream(dbPath);
@@ -218,13 +247,13 @@ function broadcast(data, excludeSocket = null) {
   const frame = encodeFrame(JSON.stringify(data));
   for (const [sock] of clients) {
     if (sock !== excludeSocket && !sock.destroyed) {
-      try { sock.write(frame); } catch (_) { }
+      try { sock.write(frame); } catch(_) {}
     }
   }
 }
 
 function sendTo(socket, data) {
-  try { socket.write(encodeFrame(JSON.stringify(data))); } catch (_) { }
+  try { socket.write(encodeFrame(JSON.stringify(data))); } catch(_) {}
 }
 
 function uniqueOnlineCount() {
@@ -290,6 +319,7 @@ server.on('upgrade', (req, socket, head) => {
         broadcast({ type: 'system', text: `${username} joined` }, socket);
         broadcastOnlineCount();
         sendTo(socket, { type: 'online', count: uniqueOnlineCount() });
+        notifyDiscord(username);
         console.log(`[JOIN] ${username}`);
       }
 
