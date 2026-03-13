@@ -708,7 +708,8 @@ const fmt=d=>d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',secon
 
 let user='',ws=null,wsOk=false,rcTimer=null,typTimer=null;
 let typClear={},typActive=new Set(),atBottom=true,newCount=0;
-const WS=`ws://${location.host}`;
+// Auto wss:// on HTTPS (required for Railway / any HTTPS host)
+const WS=`${location.protocol==='https:'?'wss':'ws'}://${location.host}`;
 
 // ── AUDIO (8-bit style) ──
 // Shared AudioContext — browsers require user gesture before audio on HTTPS
@@ -787,7 +788,11 @@ function enterChat(){
   document.getElementById('inputNick').textContent=user;
   document.getElementById('loginScreen').classList.add('hidden');
   document.getElementById('chatScreen').classList.remove('hidden');
-  connectWS();pJoin();
+  connectWS();
+  // User just clicked/pressed Enter — guaranteed gesture, unlock audio now
+  if(_actx && _actx.state==='suspended') _actx.resume();
+  else getACtx(); // create + resume
+  pJoin();
   // system line
   addSys(`CONNECTED AS [${user}] — WELCOME TO CHIT-CHAT BBS`);
 }
