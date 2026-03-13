@@ -22,11 +22,11 @@ const PORT = process.env.PORT || 3000;
 // ─────────────────────────────────────────────
 // Railway persistent volume mounts tại /data (set DB_DIR=/data trong Railway Variables)
 // Local dev: lưu vào ./data/
-const DB_DIR  = process.env.DB_DIR || path.join(__dirname, 'data');
+const DB_DIR = process.env.DB_DIR || path.join(__dirname, 'data');
 const DB_PATH = path.join(DB_DIR, 'chat.db');
 
 import { mkdirSync } from 'node:fs';
-try { mkdirSync(DB_DIR, { recursive: true }); } catch(_) {}
+try { mkdirSync(DB_DIR, { recursive: true }); } catch (_) { }
 
 console.log(`  → DB path: ${DB_PATH}`);
 const db = new DatabaseSync(DB_PATH);
@@ -67,6 +67,8 @@ const server = createServer((req, res) => {
 
   // GET /api/history — last 50 messages (newest first → reverse for display)
   if (url.pathname === '/api/history') {
+    const secret = (process.env.RESET_KEY || 'changeme').trim();
+    console.log(secret);
     const rows = getRecent.all().reverse();
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(rows));
@@ -92,7 +94,7 @@ const server = createServer((req, res) => {
     const stat = statSync(dbPath);
     res.writeHead(200, {
       'Content-Type': 'application/octet-stream',
-      'Content-Disposition': `attachment; filename="chat-${new Date().toISOString().slice(0,10)}.db"`,
+      'Content-Disposition': `attachment; filename="chat-${new Date().toISOString().slice(0, 10)}.db"`,
       'Content-Length': stat.size,
     });
     const stream = createReadStream(dbPath);
@@ -218,13 +220,13 @@ function broadcast(data, excludeSocket = null) {
   const frame = encodeFrame(JSON.stringify(data));
   for (const [sock] of clients) {
     if (sock !== excludeSocket && !sock.destroyed) {
-      try { sock.write(frame); } catch(_) {}
+      try { sock.write(frame); } catch (_) { }
     }
   }
 }
 
 function sendTo(socket, data) {
-  try { socket.write(encodeFrame(JSON.stringify(data))); } catch(_) {}
+  try { socket.write(encodeFrame(JSON.stringify(data))); } catch (_) { }
 }
 
 function uniqueOnlineCount() {
