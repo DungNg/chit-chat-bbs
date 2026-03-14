@@ -68,20 +68,24 @@ db.exec(`
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     username    TEXT    NOT NULL,
     message     TEXT    NOT NULL,
-    createdDate TEXT    NOT NULL
+    createdDate TEXT    NOT NULL,
+    type        TEXT    NOT NULL DEFAULT 'msg'
   );
-  -- Keep only last 500 messages (cleanup on startup)
   DELETE FROM messages WHERE id NOT IN (
     SELECT id FROM messages ORDER BY id DESC LIMIT 500
   );
 `);
+// Migrate old DB: add type column if missing
+try { db.exec(`ALTER TABLE messages ADD COLUMN type TEXT NOT NULL DEFAULT 'msg'`); } catch(_) {}
 
 const saveMessage = db.prepare(
-  `INSERT INTO messages (username, message, createdDate) VALUES (?, ?, ?)`
+  `INSERT INTO messages (username, message, createdDate, type) VALUES (?, ?, ?, ?)`
 );
-
+const saveSystem = db.prepare(
+  `INSERT INTO messages (username, message, createdDate, type) VALUES ('', ?, ?, 'system')`
+);
 const getRecent = db.prepare(
-  `SELECT username, message, createdDate FROM messages ORDER BY id DESC LIMIT 50`
+  `SELECT username, message, createdDate, type FROM messages ORDER BY id DESC LIMIT 50`
 );
 
 // ─────────────────────────────────────────────
@@ -308,14 +312,22 @@ server.on('upgrade', (req, socket, head) => {
       if (msg.type === 'join') {
         const username = String(msg.username || '').slice(0, 20).trim();
         if (!username) continue;
-        client.username = username;
 
-        // Send history to the joining user
+        // Check tên đã có người dùng chưa (case-insensitive, trừ chính socket này)
+        const taken = [...clients.values()].some(
+          c => c !== client && c.username && c.username.toLowerCase() === username.toLowerCase()
+        );
+        if (taken) {
+          sendTo(socket, { type: 'name_taken', name: username });
+          continue;
+        }
+
+        client.username = username;
         const history = getRecent.all().reverse();
         sendTo(socket, { type: 'history', messages: history });
 
-        // Notify everyone else
-        broadcast({ type: 'system', text: `${username} joined` }, socket);
+        const joinText = `${username} joined`;
+        broadcast({ type: 'system', text: joinText }, socket);
         broadcastOnlineCount();
         sendTo(socket, { type: 'online', count: uniqueOnlineCount() });
         notifyDiscord('join', username);
@@ -328,16 +340,9 @@ server.on('upgrade', (req, socket, head) => {
         if (!text) continue;
 
         const createdDate = new Date().toISOString();
-        // Persist to SQLite (no IP stored)
-        saveMessage.run(client.username, text, createdDate);
+        saveMessage.run(client.username, text, createdDate, 'msg');
 
-        const payload = {
-          type: 'message',
-          username: client.username,
-          message: text,
-          createdDate,
-        };
-        // Send to ALL (including sender so they get server-confirmed timestamp)
+        const payload = { type: 'message', username: client.username, message: text, createdDate };
         broadcast(payload);
         notifyDiscord(null, client.username, text);
       }
@@ -352,10 +357,22 @@ server.on('upgrade', (req, socket, head) => {
       else if (msg.type === 'rename') {
         if (!client.username) continue;
         const newName = String(msg.newName || '').slice(0, 20).trim();
-        if (!newName || newName === client.username) continue;
+        if (!newName || newName.toLowerCase() === client.username.toLowerCase()) continue;
+
+        // Check tên mới đã có người dùng chưa
+        const taken = [...clients.values()].some(
+          c => c !== client && c.username && c.username.toLowerCase() === newName.toLowerCase()
+        );
+        if (taken) {
+          sendTo(socket, { type: 'name_taken', name: newName });
+          continue;
+        }
+
         const oldName = client.username;
         client.username = newName;
-        broadcast({ type: 'system', text: `${oldName} renamed to ${newName}` });
+        const renameText = `${oldName} renamed to ${newName}`;
+        saveSystem.run(renameText, new Date().toISOString());
+        broadcast({ type: 'system', text: renameText });
       }
     }
   });

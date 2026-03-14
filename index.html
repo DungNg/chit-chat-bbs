@@ -503,6 +503,7 @@ const fmt=d=>d.toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'});
 
 let user='',ws=null,wsOk=false,rcTimer=null,typTimer=null;
 let typClear={},typActive=new Set(),atBottom=true,newCount=0;
+let client_joined=false; // true sau khi server confirm join thành công (nhận history)
 const WS=`${location.protocol==='https:'?'wss':'ws'}://${location.host}`;
 
 const AVATAR_COLORS=['#41ffe0','#ff6b9d','#5cff8c','#ffd860','#b48ef4','#4facfe','#fa709a','#f7971e'];
@@ -591,6 +592,7 @@ async function enterChat(){
 
 function connectWS(){
   if(ws){try{ws.close()}catch(_){}}
+  client_joined=false;
   ws=new WebSocket(WS);
   ws.addEventListener('open',()=>{
     wsOk=true;setConn(true);
@@ -611,15 +613,37 @@ function setConn(ok){
 function onMsg(m){
   switch(m.type){
     case'history':
+      client_joined=true;
       document.getElementById('msgsList').innerHTML='';
-      m.messages.forEach(x=>addMsg({u:x.username,txt:x.message,d:new Date(x.createdDate),own:x.username===user,skip:true}));
+      m.messages.forEach(x=>{
+        if(x.type==='system') addSys(x.message);
+        else addMsg({u:x.username,txt:x.message,d:new Date(x.createdDate),own:x.username.toLowerCase()===user.toLowerCase(),skip:true});
+      });
       scrollBot();break;
-    case'message':addMsg({u:m.username,txt:m.message,d:new Date(m.createdDate),own:m.username===user});clrTypFor(m.username);break;
+    case'message':addMsg({u:m.username,txt:m.message,d:new Date(m.createdDate),own:m.username.toLowerCase()===user.toLowerCase()});clrTypFor(m.username);break;
     case'system':addSys(m.text);break;
     case'online':
       document.getElementById('onlineCount').textContent=m.count;
       document.getElementById('onlineCount2').textContent=m.count;break;
     case'typing':showTypFor(m.username);break;
+    case'name_taken':
+      if(wsOk===false||!client_joined){
+        // Chưa join xong → quay về login
+        const ee=document.getElementById('loginErr');
+        ee.textContent=`Tên "${m.name}" đã có người dùng, chọn tên khác!`;
+        ee.style.display='block';
+        document.getElementById('uInput').classList.add('err');
+        document.getElementById('chatScreen').classList.add('hidden');
+        document.getElementById('loginScreen').classList.remove('hidden');
+        if(ws){try{ws.close()}catch(_){}}
+        ws=null;wsOk=false;
+      } else {
+        // Đang chat → đổi tên bị trùng, hiện lỗi trong modal
+        document.getElementById('rErr').textContent=`Tên "${m.name}" đã có người dùng!`;
+        document.getElementById('rErr').style.display='block';
+        document.getElementById('rInput').classList.add('err');
+      }
+      break;
   }
 }
 
