@@ -384,12 +384,15 @@ body {
   padding: 8px;
   z-index: 500;
   display: none;
+  max-width: calc(100vw - 16px);
+  overflow: hidden;
 }
 .emoji-picker.show { display: block; }
 .picker-grid {
   display: grid;
   grid-template-columns: repeat(8, 30px);
   gap: 2px;
+  overflow-x: auto;
 }
 .picker-em {
   width: 30px; height: 30px;
@@ -659,7 +662,7 @@ body {
   </div>
   <div id="gifGrid" style="
     position:relative;
-    padding:6px;max-height:260px;overflow-y:auto;
+    padding:6px;max-height:260px;overflow-y:auto;overflow-x:hidden;
   "></div>
   <div style="text-align:center;padding:5px;font-size:11px;color:#4a5080;font-family:'VT323',monospace">
     Powered by GIPHY
@@ -762,11 +765,19 @@ function buildPicker(){
 function openPicker(target,refEl){
   pickerTarget=target;
   const picker=document.getElementById('emojiPicker');
+  picker.classList.add('show'); // show first to get dimensions
+  const pickerW=picker.offsetWidth||256;
   const rect=refEl.getBoundingClientRect();
-  picker.style.bottom=(window.innerHeight-rect.top+6)+'px';
-  picker.style.left=Math.min(rect.left,window.innerWidth-260)+'px';
+  const margin=8;
+  // Position above the ref element
+  const bottom=window.innerHeight-rect.top+6;
+  // Clamp left so picker stays within screen
+  let left=rect.left;
+  if(left+pickerW>window.innerWidth-margin) left=window.innerWidth-pickerW-margin;
+  if(left<margin) left=margin;
+  picker.style.bottom=bottom+'px';
+  picker.style.left=left+'px';
   picker.style.right='auto';
-  picker.classList.add('show');
 }
 
 function closePicker(){
@@ -860,7 +871,8 @@ function renderGifs(data){
   }
 
   const COLS=3, GAP=3;
-  const colW=(grid.clientWidth - GAP*(COLS-1)) / COLS;
+  const gridPad=12; // padding 6px each side
+  const colW=Math.floor((grid.clientWidth - gridPad - GAP*(COLS-1)) / COLS);
   const colHeights=Array(COLS).fill(0);
   let loaded=0;
 
@@ -911,6 +923,10 @@ function loadGifs(q){
       grid.style.height='auto';
       grid.innerHTML='<div style="color:#ff5555;font-size:14px;padding:20px;text-align:center">Lỗi tải GIF</div>';
     });
+}
+
+function gifProxyUrl(url){
+  return `/api/gif-proxy?url=${encodeURIComponent(url)}`;
 }
 
 function sendGif(url){
@@ -1148,7 +1164,18 @@ function addMsg({id,u,txt,d,own,skip=false,reactions={},subtype='text'}){
 
   if(subtype==='gif'){
     const gb=document.createElement('div');gb.className='gif-bubble';
-    const img=document.createElement('img');img.src=txt;img.loading='lazy';img.alt='GIF';
+    const img=document.createElement('img');
+    img.src=txt;
+    img.alt='GIF';
+    img.style.width='100%';img.style.display='block';
+    img.onerror=()=>{
+      gb.innerHTML='';
+      const link=document.createElement('a');
+      link.href=txt;link.target='_blank';
+      link.style.cssText='color:var(--cyan);font-size:14px;word-break:break-all;padding:8px;display:block';
+      link.textContent='🖼 Xem GIF';
+      gb.appendChild(link);
+    };
     gb.appendChild(img);
     bwrap.appendChild(toolbar);bwrap.appendChild(gb);
   } else {
