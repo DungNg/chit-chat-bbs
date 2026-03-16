@@ -412,9 +412,6 @@ body {
   overflow: hidden; cursor: pointer;
   border: 1px solid #4a4e8c; background: #0d0f1e;
   transition: border-color .1s;
-  break-inside: avoid;
-  margin-bottom: 3px;
-  display: block;
 }
 .gif-grid-item:hover { border-color: #41ffe0; }
 .gif-grid-item img { width: 100%; height: auto; display: block; }
@@ -651,7 +648,8 @@ body {
     <button id="gifClose" style="background:none;border:none;color:#4a5080;font-size:18px;cursor:pointer;padding:0 4px">✕</button>
   </div>
   <div id="gifGrid" style="
-    column-count:3; column-gap:3px;
+    display:grid;grid-template-columns:repeat(3,1fr);gap:3px;
+    align-items:start;
     padding:6px;max-height:260px;overflow-y:auto;
   "></div>
   <div style="text-align:center;padding:5px;font-size:11px;color:#4a5080;font-family:'VT323',monospace">
