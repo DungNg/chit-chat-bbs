@@ -409,6 +409,7 @@ body {
 .gif-bubble img { width: 100%; display: block; }
 
 .gif-grid-item {
+  position: absolute;
   overflow: hidden; cursor: pointer;
   border: 1px solid #4a4e8c; background: #0d0f1e;
   transition: border-color .1s;
@@ -648,8 +649,7 @@ body {
     <button id="gifClose" style="background:none;border:none;color:#4a5080;font-size:18px;cursor:pointer;padding:0 4px">✕</button>
   </div>
   <div id="gifGrid" style="
-    display:grid;grid-template-columns:repeat(3,1fr);gap:3px;
-    align-items:start;
+    position:relative;
     padding:6px;max-height:260px;overflow-y:auto;
   "></div>
   <div style="text-align:center;padding:5px;font-size:11px;color:#4a5080;font-family:'VT323',monospace">
@@ -841,33 +841,78 @@ function renderReactions(container, reactions, msgId){
   });
 }
 
+function renderGifs(data){
+  const grid=document.getElementById('gifGrid');
+  grid.innerHTML='';
+  if(!data||!data.length){
+    grid.style.position='relative';grid.style.height='auto';
+    grid.innerHTML='<div style="color:#4a5080;font-size:14px;padding:20px;text-align:center">Không tìm thấy GIF</div>';
+    return;
+  }
+
+  const COLS=3, GAP=3;
+  const colW=(grid.clientWidth - GAP*(COLS-1)) / COLS;
+  const colHeights=Array(COLS).fill(0);
+  let loaded=0;
+
+  grid.style.position='relative';
+
+  data.forEach(gif=>{
+    const url=gif.images.fixed_height_small.url;
+    const fullUrl=gif.images.downsized_medium?.url||gif.images.original.url;
+    const nativeW=Number(gif.images.fixed_height_small.width)||100;
+    const nativeH=Number(gif.images.fixed_height_small.height)||100;
+    const scaledH=Math.round((nativeH/nativeW)*colW);
+
+    const shortCol=colHeights.indexOf(Math.min(...colHeights));
+    const x=shortCol*(colW+GAP);
+    const y=colHeights[shortCol];
+
+    const item=document.createElement('div');
+    item.className='gif-grid-item';
+    item.style.cssText=`left:${x}px;top:${y}px;width:${colW}px;`;
+
+    const img=document.createElement('img');
+    img.src=url;img.loading='lazy';img.alt='';
+    img.style.height=scaledH+'px';
+
+    item.appendChild(img);
+    item.onclick=()=>{
+      sendGif(fullUrl);
+      document.getElementById('gifPicker').style.display='none';
+      document.getElementById('gifSearch').value='';
+    };
+    grid.appendChild(item);
+    colHeights[shortCol]+=scaledH+GAP;
+    grid.style.height=Math.max(...colHeights)+'px';
+  });
+}
+
+const MOCK_GIFS=[
+  {images:{fixed_height_small:{url:'https://media.giphy.com/media/3oEjI6SIIHBdRxXI40/100w.gif',width:'100',height:'56'},downsized_medium:{url:'https://media.giphy.com/media/3oEjI6SIIHBdRxXI40/giphy.gif'},original:{url:'https://media.giphy.com/media/3oEjI6SIIHBdRxXI40/giphy.gif'}}},
+  {images:{fixed_height_small:{url:'https://media.giphy.com/media/ule4vhcY1xEKQ/100w.gif',width:'100',height:'100'},downsized_medium:{url:'https://media.giphy.com/media/ule4vhcY1xEKQ/giphy.gif'},original:{url:'https://media.giphy.com/media/ule4vhcY1xEKQ/giphy.gif'}}},
+  {images:{fixed_height_small:{url:'https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/100w.gif',width:'100',height:'75'},downsized_medium:{url:'https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif'},original:{url:'https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif'}}},
+  {images:{fixed_height_small:{url:'https://media.giphy.com/media/5VKbvrjxpVJCM/100w.gif',width:'100',height:'130'},downsized_medium:{url:'https://media.giphy.com/media/5VKbvrjxpVJCM/giphy.gif'},original:{url:'https://media.giphy.com/media/5VKbvrjxpVJCM/giphy.gif'}}},
+  {images:{fixed_height_small:{url:'https://media.giphy.com/media/26ufdipQqU2lhNA4g/100w.gif',width:'100',height:'56'},downsized_medium:{url:'https://media.giphy.com/media/26ufdipQqU2lhNA4g/giphy.gif'},original:{url:'https://media.giphy.com/media/26ufdipQqU2lhNA4g/giphy.gif'}}},
+  {images:{fixed_height_small:{url:'https://media.giphy.com/media/l4Jz3a8jO92crUlWM/100w.gif',width:'100',height:'100'},downsized_medium:{url:'https://media.giphy.com/media/l4Jz3a8jO92crUlWM/giphy.gif'},original:{url:'https://media.giphy.com/media/l4Jz3a8jO92crUlWM/giphy.gif'}}},
+  {images:{fixed_height_small:{url:'https://media.giphy.com/media/3oEjI6SIIHBdRxXI40/100w.gif',width:'100',height:'80'},downsized_medium:{url:'https://media.giphy.com/media/3oEjI6SIIHBdRxXI40/giphy.gif'},original:{url:'https://media.giphy.com/media/3oEjI6SIIHBdRxXI40/giphy.gif'}}},
+  {images:{fixed_height_small:{url:'https://media.giphy.com/media/ule4vhcY1xEKQ/100w.gif',width:'100',height:'120'},downsized_medium:{url:'https://media.giphy.com/media/ule4vhcY1xEKQ/giphy.gif'},original:{url:'https://media.giphy.com/media/ule4vhcY1xEKQ/giphy.gif'}}},
+  {images:{fixed_height_small:{url:'https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/100w.gif',width:'100',height:'60'},downsized_medium:{url:'https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif'},original:{url:'https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif'}}},
+];
+
 function loadGifs(q){
   const grid=document.getElementById('gifGrid');
-  grid.innerHTML='<div style="color:#4a5080;font-size:14px;padding:20px;text-align:center;grid-column:1/-1">Loading...</div>';
+  grid.style.height='60px';
+  grid.innerHTML='<div style="color:#4a5080;font-size:14px;padding:20px;text-align:center">Loading...</div>';
   fetch(`/api/giphy?q=${encodeURIComponent(q)}`)
     .then(r=>r.json())
     .then(data=>{
-      grid.innerHTML='';
-      if(!data.data||!data.data.length){
-        grid.innerHTML='<div style="color:#4a5080;font-size:14px;padding:20px;text-align:center;grid-column:1/-1">Không tìm thấy GIF</div>';
-        return;
-      }
-      data.data.forEach(gif=>{
-        const url=gif.images.fixed_height_small.url;
-        const fullUrl=gif.images.downsized_medium.url||gif.images.original.url;
-        const item=document.createElement('div');item.className='gif-grid-item';
-        const img=document.createElement('img');img.src=url;img.loading='lazy';
-        item.appendChild(img);
-        item.onclick=()=>{
-          sendGif(fullUrl);
-          document.getElementById('gifPicker').style.display='none';
-          document.getElementById('gifSearch').value='';
-        };
-        grid.appendChild(item);
-      });
+      if(data.data) renderGifs(data.data);
+      else renderGifs([]);
     })
     .catch(()=>{
-      grid.innerHTML='<div style="color:#ff5555;font-size:14px;padding:20px;text-align:center;grid-column:1/-1">Lỗi tải GIF</div>';
+      // Fallback mock data khi chưa có API key / đang test local
+      renderGifs(MOCK_GIFS);
     });
 }
 
