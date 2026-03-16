@@ -222,6 +222,16 @@ body {
   margin: 4px 0;
 }
 
+.msg-date {
+  text-align: center; font-size: 12px;
+  color: var(--dim); margin: 10px 0 4px;
+  display: flex; align-items: center; gap: 8px;
+}
+.msg-date::before, .msg-date::after {
+  content: ''; flex: 1;
+  border-top: 1px dashed var(--dim);
+}
+
 .msg-row {
   display: flex; align-items: flex-end; gap: 8px;
   padding: 3px 0;
@@ -614,6 +624,7 @@ function onMsg(m){
   switch(m.type){
     case'history':
       client_joined=true;
+      lastDateShown=null;
       document.getElementById('msgsList').innerHTML='';
       m.messages.forEach(x=>{
         if(x.type==='system') addSys(x.message);
@@ -706,6 +717,29 @@ function confirmRename(){
   closeRename();
 }
 
+let lastDateShown = null;
+
+function fmtDate(d){
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate()-1);
+  const ds = d.toDateString();
+  if(ds === today.toDateString()) return 'Hôm nay';
+  if(ds === yesterday.toDateString()) return 'Hôm qua';
+  return d.toLocaleDateString('vi-VN',{weekday:'long',day:'numeric',month:'numeric',year:'numeric'});
+}
+
+function maybeShowDate(d){
+  const ds = d.toDateString();
+  if(ds === lastDateShown) return;
+  lastDateShown = ds;
+  const list = document.getElementById('msgsList');
+  const div = document.createElement('div');
+  div.className = 'msg-date';
+  div.textContent = fmtDate(d);
+  list.appendChild(div);
+}
+
 function addSys(text){
   const list=document.getElementById('msgsList');
   const d=document.createElement('div');d.className='msg-sys';
@@ -714,6 +748,7 @@ function addSys(text){
 }
 
 function addMsg({u,txt,d,own,skip=false}){
+  maybeShowDate(d);
   const list=document.getElementById('msgsList');
   const row=document.createElement('div');
   row.className=`msg-row ${own?'own':'other'}`;
