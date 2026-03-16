@@ -93,14 +93,17 @@ const removeReaction = db.prepare(`DELETE FROM reactions WHERE msg_id=? AND user
 const getReactions   = db.prepare(`SELECT msg_id, emoji, username FROM reactions WHERE msg_id IN (SELECT id FROM messages ORDER BY id DESC LIMIT 50)`);
 const getReactionsForMsg = db.prepare(`SELECT emoji, username FROM reactions WHERE msg_id=?`);
 
+// Migrate: add subtype column if missing (text | gif)
+try { db.exec(`ALTER TABLE messages ADD COLUMN subtype TEXT NOT NULL DEFAULT 'text'`); } catch(_) {}
+
 const saveMessage = db.prepare(
-  `INSERT INTO messages (username, message, createdDate, type) VALUES (?, ?, ?, ?)`
+  `INSERT INTO messages (username, message, createdDate, type, subtype) VALUES (?, ?, ?, ?, ?)`
 );
 const saveSystem = db.prepare(
   `INSERT INTO messages (username, message, createdDate, type) VALUES ('', ?, ?, 'system')`
 );
 const getRecent = db.prepare(
-  `SELECT id, username, message, createdDate, type FROM messages ORDER BY id DESC LIMIT 50`
+  `SELECT id, username, message, createdDate, type, subtype FROM messages ORDER BY id DESC LIMIT 50`
 );
 
 // ─────────────────────────────────────────────
@@ -109,18 +112,44 @@ const getRecent = db.prepare(
 const server = createServer((req, res) => {
   const url = new URL(req.url, `http://localhost`);
 
-  // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
 
-  // GET /api/history — last 50 messages (newest first → reverse for display)
+  // GET /api/history
   if (url.pathname === '/api/history') {
     const rows = getRecent.all().reverse();
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(rows));
+    return;
+  }
+
+  // GET /api/giphy?q=... — proxy Giphy search (giấu API key)
+  if (url.pathname === '/api/giphy') {
+    const q = (url.searchParams.get('q') || '').trim();
+    const key = process.env.GIPHY_KEY || '';
+    if (!key) {
+      res.writeHead(503, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'GIPHY_KEY not configured' }));
+      return;
+    }
+    const endpoint = q
+      ? `https://api.giphy.com/v1/gifs/search?api_key=${key}&q=${encodeURIComponent(q)}&limit=18&rating=g`
+      : `https://api.giphy.com/v1/gifs/trending?api_key=${key}&limit=18&rating=g`;
+
+    https.get(endpoint, gRes => {
+      let data = '';
+      gRes.on('data', c => data += c);
+      gRes.on('end', () => {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(data);
+      });
+    }).on('error', err => {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: err.message }));
+    });
     return;
   }
 
@@ -364,10 +393,11 @@ server.on('upgrade', (req, socket, head) => {
         if (!text) continue;
 
         const createdDate = new Date().toISOString();
-        const result = saveMessage.run(client.username, text, createdDate, 'msg');
+        const subtype = String(msg.subtype || 'text');
+        const result = saveMessage.run(client.username, text, createdDate, 'msg', subtype);
         const msgId = Number(result.lastInsertRowid);
 
-        const payload = { type: 'message', id: msgId, username: client.username, message: text, createdDate, reactions: {} };
+        const payload = { type: 'message', id: msgId, username: client.username, message: text, createdDate, subtype, reactions: {} };
         broadcast(payload);
         notifyDiscord(null, client.username, text);
       }

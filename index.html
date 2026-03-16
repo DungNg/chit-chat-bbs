@@ -401,6 +401,21 @@ body {
 .picker-em:hover { background: rgba(255,255,255,.08); }
 
 /* Emoji button in input row */
+.gif-bubble {
+  max-width: 200px; border-radius: 4px; overflow: hidden;
+  border: 2px solid var(--border); box-shadow: 3px 3px 0 rgba(0,0,0,.4);
+  cursor: pointer;
+}
+.gif-bubble img { width: 100%; display: block; }
+
+.gif-grid-item {
+  aspect-ratio: 1; overflow: hidden; cursor: pointer;
+  border: 1px solid #4a4e8c; background: #0d0f1e;
+  transition: border-color .1s;
+}
+.gif-grid-item:hover { border-color: #41ffe0; }
+.gif-grid-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
 .emoji-input-btn {
   background: none;
   border: none; border-left: var(--px) solid var(--border);
@@ -608,12 +623,36 @@ body {
       <div class="input-row">
         <div class="input-prompt">▸</div>
         <input class="chat-input" id="msgInput" type="text" placeholder="type your message..." maxlength="500" autocomplete="off" spellcheck="false"/>
+        <button class="emoji-input-btn" id="gifInputBtn" title="GIF" style="font-size:11px;font-family:'Press Start 2P',monospace;letter-spacing:0;padding:0 8px;width:auto">GIF</button>
         <button class="emoji-input-btn" id="emojiInputBtn" title="Emoji">😊</button>
         <button class="send-btn" id="sendBtn">SEND</button>
       </div>
       <div class="input-hint">/nick NAME để đổi tên &nbsp;·&nbsp; <span id="onlineCount2">0</span> người online</div>
     </div>
 
+  </div>
+</div>
+
+<!-- GIF PICKER -->
+<div id="gifPicker" style="
+  display:none; position:fixed; bottom:80px; left:50%; transform:translateX(-50%);
+  width:min(360px, 96vw);
+  background:#1a1c2c; border:1px solid #4a4e8c;
+  box-shadow:4px 4px 0 #0a0c1a; z-index:400;
+">
+  <div style="padding:8px;border-bottom:1px solid #4a4e8c;display:flex;gap:6px;align-items:center">
+    <input id="gifSearch" type="text" placeholder="Search GIFs..." style="
+      flex:1;background:#0d0f1e;border:1px solid #4a4e8c;color:#e8f0ff;
+      font-family:'VT323',monospace;font-size:18px;padding:6px 10px;outline:none;
+    "/>
+    <button id="gifClose" style="background:none;border:none;color:#4a5080;font-size:18px;cursor:pointer;padding:0 4px">✕</button>
+  </div>
+  <div id="gifGrid" style="
+    display:grid;grid-template-columns:repeat(3,1fr);gap:3px;
+    padding:6px;max-height:240px;overflow-y:auto;
+  "></div>
+  <div style="text-align:center;padding:5px;font-size:11px;color:#4a5080;font-family:'VT323',monospace">
+    Powered by GIPHY
   </div>
 </div>
 
@@ -751,6 +790,25 @@ window.onload=()=>{
     if(pickerTarget==='input'){closePicker();return;}
     openPicker('input',e.currentTarget);
   });
+  document.getElementById('gifInputBtn').addEventListener('click', e=>{
+    e.stopPropagation();
+    const picker = document.getElementById('gifPicker');
+    const isOpen = picker.style.display !== 'none';
+    if(isOpen){ picker.style.display='none'; return; }
+    picker.style.display='block';
+    loadGifs('');
+    setTimeout(()=>document.getElementById('gifSearch').focus(), 50);
+  });
+  document.getElementById('gifClose').addEventListener('click', ()=>{
+    document.getElementById('gifPicker').style.display='none';
+  });
+  let gifSearchTimer=null;
+  document.getElementById('gifSearch').addEventListener('input', e=>{
+    clearTimeout(gifSearchTimer);
+    gifSearchTimer=setTimeout(()=>loadGifs(e.target.value.trim()), 400);
+  });
+  document.getElementById('gifPicker').addEventListener('click', e=>e.stopPropagation());
+  document.addEventListener('click', ()=>{ document.getElementById('gifPicker').style.display='none'; });
   document.addEventListener('click',closePicker);
   document.getElementById('emojiPicker').addEventListener('click',e=>e.stopPropagation());
   document.addEventListener('touchend',unlockAudio,{once:true});
@@ -780,6 +838,42 @@ function renderReactions(container, reactions, msgId){
     pill.onclick=e=>{e.stopPropagation();sendReact(msgId,emoji);};
     container.appendChild(pill);
   });
+}
+
+function loadGifs(q){
+  const grid=document.getElementById('gifGrid');
+  grid.innerHTML='<div style="color:#4a5080;font-size:14px;padding:20px;text-align:center;grid-column:1/-1">Loading...</div>';
+  fetch(`/api/giphy?q=${encodeURIComponent(q)}`)
+    .then(r=>r.json())
+    .then(data=>{
+      grid.innerHTML='';
+      if(!data.data||!data.data.length){
+        grid.innerHTML='<div style="color:#4a5080;font-size:14px;padding:20px;text-align:center;grid-column:1/-1">Không tìm thấy GIF</div>';
+        return;
+      }
+      data.data.forEach(gif=>{
+        const url=gif.images.fixed_height_small.url;
+        const fullUrl=gif.images.downsized_medium.url||gif.images.original.url;
+        const item=document.createElement('div');item.className='gif-grid-item';
+        const img=document.createElement('img');img.src=url;img.loading='lazy';
+        item.appendChild(img);
+        item.onclick=()=>{
+          sendGif(fullUrl);
+          document.getElementById('gifPicker').style.display='none';
+          document.getElementById('gifSearch').value='';
+        };
+        grid.appendChild(item);
+      });
+    })
+    .catch(()=>{
+      grid.innerHTML='<div style="color:#ff5555;font-size:14px;padding:20px;text-align:center;grid-column:1/-1">Lỗi tải GIF</div>';
+    });
+}
+
+function sendGif(url){
+  if(!wsOk)return;
+  ws.send(JSON.stringify({type:'message', message:url, subtype:'gif'}));
+  pSend();
 }
 
 function valNick(n){
@@ -840,10 +934,10 @@ function onMsg(m){
       document.getElementById('msgsList').innerHTML='';
       m.messages.forEach(x=>{
         if(x.type==='system') addSys(x.message);
-        else addMsg({id:x.id,u:x.username,txt:x.message,d:new Date(x.createdDate),own:x.username.toLowerCase()===user.toLowerCase(),skip:true,reactions:x.reactions||{}});
+        else addMsg({id:x.id,u:x.username,txt:x.message,d:new Date(x.createdDate),own:x.username.toLowerCase()===user.toLowerCase(),skip:true,reactions:x.reactions||{},subtype:x.subtype||'text'});
       });
       scrollBot();break;
-    case'message':addMsg({id:m.id,u:m.username,txt:m.message,d:new Date(m.createdDate),own:m.username.toLowerCase()===user.toLowerCase(),reactions:m.reactions||{}});clrTypFor(m.username);break;
+    case'message':addMsg({id:m.id,u:m.username,txt:m.message,d:new Date(m.createdDate),own:m.username.toLowerCase()===user.toLowerCase(),reactions:m.reactions||{},subtype:m.subtype||'text'});clrTypFor(m.username);break;
     case'system':addSys(m.text);break;
     case'online':
       document.getElementById('onlineCount').textContent=m.count;
@@ -964,7 +1058,7 @@ function addSys(text){
   if(atBottom)scrollBot();
 }
 
-function addMsg({id,u,txt,d,own,skip=false,reactions={}}){
+function addMsg({id,u,txt,d,own,skip=false,reactions={},subtype='text'}){
   maybeShowDate(d);
   const list=document.getElementById('msgsList');
   const row=document.createElement('div');
@@ -1009,10 +1103,15 @@ function addMsg({id,u,txt,d,own,skip=false,reactions={}}){
   };
   toolbar.appendChild(moreBtn);
 
-  const bubble=document.createElement('div');bubble.className='msg-bubble';bubble.textContent=txt;
-
-  bwrap.appendChild(toolbar);
-  bwrap.appendChild(bubble);
+  if(subtype==='gif'){
+    const gb=document.createElement('div');gb.className='gif-bubble';
+    const img=document.createElement('img');img.src=txt;img.loading='lazy';img.alt='GIF';
+    gb.appendChild(img);
+    bwrap.appendChild(toolbar);bwrap.appendChild(gb);
+  } else {
+    const bubble=document.createElement('div');bubble.className='msg-bubble';bubble.textContent=txt;
+    bwrap.appendChild(toolbar);bwrap.appendChild(bubble);
+  }
 
   // Reactions row
   const rc=document.createElement('div');
