@@ -78,6 +78,21 @@ db.exec(`
 // Migrate old DB: add type column if missing
 try { db.exec(`ALTER TABLE messages ADD COLUMN type TEXT NOT NULL DEFAULT 'msg'`); } catch(_) {}
 
+// Reactions table
+db.exec(`
+  CREATE TABLE IF NOT EXISTS reactions (
+    msg_id   INTEGER NOT NULL,
+    username TEXT    NOT NULL,
+    emoji    TEXT    NOT NULL,
+    PRIMARY KEY (msg_id, username, emoji)
+  );
+`);
+
+const addReaction    = db.prepare(`INSERT OR IGNORE INTO reactions (msg_id, username, emoji) VALUES (?, ?, ?)`);
+const removeReaction = db.prepare(`DELETE FROM reactions WHERE msg_id=? AND username=? AND emoji=?`);
+const getReactions   = db.prepare(`SELECT msg_id, emoji, username FROM reactions WHERE msg_id IN (SELECT id FROM messages ORDER BY id DESC LIMIT 50)`);
+const getReactionsForMsg = db.prepare(`SELECT emoji, username FROM reactions WHERE msg_id=?`);
+
 const saveMessage = db.prepare(
   `INSERT INTO messages (username, message, createdDate, type) VALUES (?, ?, ?, ?)`
 );
@@ -85,7 +100,7 @@ const saveSystem = db.prepare(
   `INSERT INTO messages (username, message, createdDate, type) VALUES ('', ?, ?, 'system')`
 );
 const getRecent = db.prepare(
-  `SELECT username, message, createdDate, type FROM messages ORDER BY id DESC LIMIT 50`
+  `SELECT id, username, message, createdDate, type FROM messages ORDER BY id DESC LIMIT 50`
 );
 
 // ─────────────────────────────────────────────
@@ -324,6 +339,15 @@ server.on('upgrade', (req, socket, head) => {
 
         client.username = username;
         const history = getRecent.all().reverse();
+        // Attach reactions to history
+        const allReacts = getReactions.all();
+        const reactMap = {};
+        allReacts.forEach(r => {
+          if (!reactMap[r.msg_id]) reactMap[r.msg_id] = {};
+          if (!reactMap[r.msg_id][r.emoji]) reactMap[r.msg_id][r.emoji] = [];
+          reactMap[r.msg_id][r.emoji].push(r.username);
+        });
+        history.forEach(m => { m.reactions = reactMap[m.id] || {}; });
         sendTo(socket, { type: 'history', messages: history });
 
         const joinText = `${username} joined`;
@@ -340,11 +364,37 @@ server.on('upgrade', (req, socket, head) => {
         if (!text) continue;
 
         const createdDate = new Date().toISOString();
-        saveMessage.run(client.username, text, createdDate, 'msg');
+        const result = saveMessage.run(client.username, text, createdDate, 'msg');
+        const msgId = Number(result.lastInsertRowid);
 
-        const payload = { type: 'message', username: client.username, message: text, createdDate };
+        const payload = { type: 'message', id: msgId, username: client.username, message: text, createdDate, reactions: {} };
         broadcast(payload);
         notifyDiscord(null, client.username, text);
+      }
+
+      // ── REACT ──
+      else if (msg.type === 'react') {
+        if (!client.username) continue;
+        const msgId = Number(msg.msgId);
+        const emoji = String(msg.emoji || '').trim();
+        if (!msgId || !emoji) continue;
+
+        // Toggle: nếu đã react thì bỏ, chưa thì thêm
+        const existing = db.prepare(`SELECT 1 FROM reactions WHERE msg_id=? AND username=? AND emoji=?`).get(msgId, client.username, emoji);
+        if (existing) {
+          removeReaction.run(msgId, client.username, emoji);
+        } else {
+          addReaction.run(msgId, client.username, emoji);
+        }
+
+        // Build updated reactions for this msg
+        const rows = getReactionsForMsg.all(msgId);
+        const reactMap = {};
+        rows.forEach(r => {
+          if (!reactMap[r.emoji]) reactMap[r.emoji] = [];
+          reactMap[r.emoji].push(r.username);
+        });
+        broadcast({ type: 'reactions_update', msgId, reactions: reactMap });
       }
 
       // ── TYPING ──

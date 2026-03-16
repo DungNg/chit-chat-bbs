@@ -281,6 +281,137 @@ body {
   border-bottom-right-radius: 0;
 }
 
+/* Bubble wrap for hover toolbar */
+.bubble-wrap { position: relative; display: inline-block; max-width: 100%; }
+
+/* Reaction toolbar on hover */
+.react-toolbar {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 0;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  box-shadow: 3px 3px 0 #0a0c1a;
+  padding: 4px 6px;
+  display: flex; gap: 2px;
+  opacity: 0; pointer-events: none;
+  transition: opacity .15s;
+  white-space: nowrap;
+  z-index: 50;
+}
+.msg-row.own .react-toolbar { left: auto; right: 0; }
+
+/* Bridge gap between bubble and toolbar so hover doesn't break */
+.react-toolbar::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 0; right: 0;
+  height: 8px;
+}
+
+.bubble-wrap:hover .react-toolbar,
+.react-toolbar:hover { opacity: 1; pointer-events: all; }
+
+.react-quick-btn {
+  width: 26px; height: 26px;
+  border: none; background: none; cursor: pointer;
+  font-size: 16px;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .1s; border-radius: 2px;
+}
+.react-quick-btn:hover { background: var(--surface2); }
+
+/* More emoji button in toolbar */
+.react-more-btn {
+  width: 26px; height: 26px;
+  border: none; background: none; cursor: pointer;
+  font-size: 12px; color: var(--dim);
+  display: flex; align-items: center; justify-content: center;
+  border-left: 1px solid var(--border); margin-left: 2px;
+  padding-left: 4px;
+  transition: color .1s;
+}
+.react-more-btn:hover { color: var(--cyan); }
+
+/* Reaction pills */
+.reactions-row {
+  display: flex; flex-wrap: wrap; gap: 4px;
+  padding: 2px 0 0;
+}
+
+.react-pill {
+  display: flex; align-items: center; gap: 3px;
+  padding: 2px 7px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,.04);
+  font-size: 13px; cursor: pointer;
+  transition: background .1s, border-color .1s;
+  position: relative;
+}
+.react-pill:hover { background: rgba(255,255,255,.08); }
+.react-pill.mine { border-color: var(--purple); background: rgba(180,142,244,.12); }
+.react-pill .pill-count { font-size: 12px; color: var(--dim); font-family: 'VT323', monospace; }
+.react-pill.mine .pill-count { color: var(--purple); }
+
+/* Tooltip who reacted */
+.react-pill .react-tooltip {
+  position: absolute;
+  bottom: calc(100% + 5px);
+  left: 50%; transform: translateX(-50%);
+  background: #0a0c1a;
+  border: 1px solid var(--border);
+  box-shadow: 2px 2px 0 rgba(0,0,0,.5);
+  color: var(--white);
+  font-size: 11px;
+  padding: 4px 8px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .15s;
+  z-index: 60;
+  font-family: 'VT323', monospace;
+  letter-spacing: .03em;
+}
+.react-pill:hover .react-tooltip { opacity: 1; }
+
+/* Emoji picker popup */
+.emoji-picker {
+  position: fixed;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  box-shadow: 4px 4px 0 #0a0c1a;
+  padding: 8px;
+  z-index: 500;
+  display: none;
+}
+.emoji-picker.show { display: block; }
+.picker-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 30px);
+  gap: 2px;
+}
+.picker-em {
+  width: 30px; height: 30px;
+  border: none; background: none; cursor: pointer;
+  font-size: 17px;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .08s;
+}
+.picker-em:hover { background: rgba(255,255,255,.08); }
+
+/* Emoji button in input row */
+.emoji-input-btn {
+  background: none;
+  border: none; border-left: var(--px) solid var(--border);
+  color: var(--dim);
+  font-size: 18px; padding: 0 10px;
+  cursor: pointer; flex-shrink: 0;
+  transition: color .1s;
+  display: flex; align-items: center;
+}
+.emoji-input-btn:hover { color: var(--yellow); }
+
 /* Typing */
 .typing-bar {
   padding: 3px 14px 5px;
@@ -441,7 +572,7 @@ body {
       <label class="field-label" for="uInput">▸ ENTER YOUR NAME</label>
       <input class="field-input" id="uInput" type="text" placeholder="PLAYER_ONE" maxlength="20" autocomplete="off" spellcheck="false" autocorrect="off"/>
       <div class="err-msg" id="loginErr"></div>
-      <button class="login-btn" onclick="enterChat()">▸ START GAME ◂</button>
+      <button class="login-btn" id="loginBtn">▸ START GAME ◂</button>
     </div>
     <div class="login-note">[ 🔒 NO IP STORED · <b>ANONYMOUS</b> ]</div>
   </div>
@@ -460,7 +591,7 @@ body {
         </div>
       </div>
       <div class="hdr-right">
-        <div class="user-tag" onclick="openRename()" title="Đổi tên">
+        <div class="user-tag" id="userTag" title="Đổi tên">
           <span class="tag-icon">▸</span>
           <span id="headerUser">...</span>
         </div>
@@ -477,6 +608,7 @@ body {
       <div class="input-row">
         <div class="input-prompt">▸</div>
         <input class="chat-input" id="msgInput" type="text" placeholder="type your message..." maxlength="500" autocomplete="off" spellcheck="false"/>
+        <button class="emoji-input-btn" id="emojiInputBtn" title="Emoji">😊</button>
         <button class="send-btn" id="sendBtn">SEND</button>
       </div>
       <div class="input-hint">/nick NAME để đổi tên &nbsp;·&nbsp; <span id="onlineCount2">0</span> người online</div>
@@ -498,11 +630,15 @@ body {
       <input class="field-input" id="rInput" type="text" placeholder="NEW_NAME" maxlength="20" autocomplete="off" spellcheck="false"/>
       <div class="err-msg" id="rErr"></div>
       <div class="modal-actions">
-        <button class="btn-cancel" onclick="closeRename()">CANCEL</button>
-        <button class="btn-confirm" onclick="confirmRename()">CONFIRM</button>
+        <button class="btn-cancel" id="cancelBtn">CANCEL</button>
+        <button class="btn-confirm" id="confirmBtn">CONFIRM</button>
       </div>
     </div>
   </div>
+</div>
+
+<div class="emoji-picker" id="emojiPicker">
+  <div class="picker-grid" id="pickerGrid"></div>
 </div>
 
 <div class="toast-wrap" id="toastWrap"></div>
@@ -550,12 +686,56 @@ const pNotif=()=>beep8([[880,.0,.05],[1047,.06,.05]]);
 const pJoin =()=>beep8([[262,.0,.08],[330,.09,.08],[392,.18,.08],[523,.27,.12]]);
 const pSend =()=>beep8([[660,.0,.04],[880,.05,.04]]);
 
+const EMOJIS=['😀','😂','🥹','😍','🤔','😅','😭','🥰','😎','🤯','😱','🥳','😤','🤗','😴','🤩','👍','👎','❤️','🔥','✨','💯','🎉','👏','🙌','💪','🫡','👀','🫂','💀','😈','🤡','🐸','💎','🚀','⚡','🌈','🍀'];
+const QUICK_REACTS=['👍','❤️','😂','😮','😢','🔥','🎉','💯'];
+
+let pickerTarget=null; // 'input' | {msgId}
+
+function buildPicker(){
+  const grid=document.getElementById('pickerGrid');
+  EMOJIS.forEach(em=>{
+    const btn=document.createElement('button');
+    btn.className='picker-em';btn.textContent=em;
+    btn.onclick=e=>{
+      e.stopPropagation();
+      if(pickerTarget==='input'){
+        const inp=document.getElementById('msgInput');
+        inp.value+=em;inp.focus();
+      } else if(pickerTarget!==null){
+        sendReact(pickerTarget,em);
+      }
+      closePicker();
+    };
+    grid.appendChild(btn);
+  });
+}
+
+function openPicker(target,refEl){
+  pickerTarget=target;
+  const picker=document.getElementById('emojiPicker');
+  const rect=refEl.getBoundingClientRect();
+  picker.style.bottom=(window.innerHeight-rect.top+6)+'px';
+  picker.style.left=Math.min(rect.left,window.innerWidth-260)+'px';
+  picker.style.right='auto';
+  picker.classList.add('show');
+}
+
+function closePicker(){
+  document.getElementById('emojiPicker').classList.remove('show');
+  pickerTarget=null;
+}
+
 const saveU=n=>{try{localStorage.setItem('cc_nick',n)}catch(_){}};
 const loadU=()=>{try{return localStorage.getItem('cc_nick')||''}catch(_){return''}};
 
 window.onload=()=>{
+  buildPicker();
   const sv=loadU();if(sv)document.getElementById('uInput').value=sv;
+  document.getElementById('loginBtn').addEventListener('click',enterChat);
   document.getElementById('uInput').addEventListener('keydown',e=>{if(e.key==='Enter')enterChat()});
+  document.getElementById('userTag').addEventListener('click',openRename);
+  document.getElementById('cancelBtn').addEventListener('click',closeRename);
+  document.getElementById('confirmBtn').addEventListener('click',confirmRename);
   document.getElementById('msgInput').addEventListener('keydown',e=>{if(e.key==='Enter'){doSend();return}});
   document.getElementById('msgInput').addEventListener('input',onType);
   document.getElementById('rInput').addEventListener('keydown',e=>{if(e.key==='Enter')confirmRename()});
@@ -566,9 +746,41 @@ window.onload=()=>{
   });
   document.getElementById('sendBtn').addEventListener('touchend',e=>{e.preventDefault();doSend();},{passive:false});
   document.getElementById('sendBtn').addEventListener('click',doSend);
+  document.getElementById('emojiInputBtn').addEventListener('click',e=>{
+    e.stopPropagation();
+    if(pickerTarget==='input'){closePicker();return;}
+    openPicker('input',e.currentTarget);
+  });
+  document.addEventListener('click',closePicker);
+  document.getElementById('emojiPicker').addEventListener('click',e=>e.stopPropagation());
   document.addEventListener('touchend',unlockAudio,{once:true});
   document.addEventListener('touchstart',unlockAudio,{once:true});
 };
+
+function sendReact(msgId,emoji){
+  if(!wsOk||!msgId)return;
+  ws.send(JSON.stringify({type:'react',msgId:Number(msgId),emoji}));
+}
+
+function renderReactions(container, reactions, msgId){
+  container.innerHTML='';
+  Object.entries(reactions||{}).forEach(([emoji,users])=>{
+    if(!users.length)return;
+    const mine=users.some(u=>u.toLowerCase()===user.toLowerCase());
+    const pill=document.createElement('div');
+    pill.className=`react-pill${mine?' mine':''}`;
+
+    const tip=document.createElement('div');
+    tip.className='react-tooltip';
+    tip.textContent=users.join(', ');
+
+    const em=document.createElement('span');em.textContent=emoji;
+    const cnt=document.createElement('span');cnt.className='pill-count';cnt.textContent=users.length;
+    pill.appendChild(tip);pill.appendChild(em);pill.appendChild(cnt);
+    pill.onclick=e=>{e.stopPropagation();sendReact(msgId,emoji);};
+    container.appendChild(pill);
+  });
+}
 
 function valNick(n){
   n=n.trim();
@@ -628,15 +840,20 @@ function onMsg(m){
       document.getElementById('msgsList').innerHTML='';
       m.messages.forEach(x=>{
         if(x.type==='system') addSys(x.message);
-        else addMsg({u:x.username,txt:x.message,d:new Date(x.createdDate),own:x.username.toLowerCase()===user.toLowerCase(),skip:true});
+        else addMsg({id:x.id,u:x.username,txt:x.message,d:new Date(x.createdDate),own:x.username.toLowerCase()===user.toLowerCase(),skip:true,reactions:x.reactions||{}});
       });
       scrollBot();break;
-    case'message':addMsg({u:m.username,txt:m.message,d:new Date(m.createdDate),own:m.username.toLowerCase()===user.toLowerCase()});clrTypFor(m.username);break;
+    case'message':addMsg({id:m.id,u:m.username,txt:m.message,d:new Date(m.createdDate),own:m.username.toLowerCase()===user.toLowerCase(),reactions:m.reactions||{}});clrTypFor(m.username);break;
     case'system':addSys(m.text);break;
     case'online':
       document.getElementById('onlineCount').textContent=m.count;
       document.getElementById('onlineCount2').textContent=m.count;break;
     case'typing':showTypFor(m.username);break;
+    case'reactions_update':{
+      const rc=document.getElementById('rc-'+m.msgId);
+      if(rc)renderReactions(rc,m.reactions,m.msgId);
+      break;
+    }
     case'name_taken':
       if(wsOk===false||!client_joined){
         // Chưa join xong → quay về login
@@ -747,7 +964,7 @@ function addSys(text){
   if(atBottom)scrollBot();
 }
 
-function addMsg({u,txt,d,own,skip=false}){
+function addMsg({id,u,txt,d,own,skip=false,reactions={}}){
   maybeShowDate(d);
   const list=document.getElementById('msgsList');
   const row=document.createElement('div');
@@ -768,9 +985,42 @@ function addMsg({u,txt,d,own,skip=false}){
   const time=document.createElement('span');time.className='msg-time';time.textContent=fmt(d);
   meta.appendChild(name);meta.appendChild(time);
 
+  // Bubble wrap with hover toolbar
+  const bwrap=document.createElement('div');bwrap.className='bubble-wrap';
+
+  // Quick react toolbar
+  const toolbar=document.createElement('div');toolbar.className='react-toolbar';
+  QUICK_REACTS.forEach(em=>{
+    const btn=document.createElement('button');btn.className='react-quick-btn';
+    btn.textContent=em;btn.title=em;
+    btn.onclick=e=>{
+      e.stopPropagation();
+      if(!id){console.warn('react: no msg id');return;}
+      sendReact(id,em);
+    };
+    toolbar.appendChild(btn);
+  });
+  const moreBtn=document.createElement('button');moreBtn.className='react-more-btn';
+  moreBtn.textContent='+';moreBtn.title='Thêm emoji';
+  moreBtn.onclick=e=>{
+    e.stopPropagation();
+    if(!id){return;}
+    openPicker(id,moreBtn);
+  };
+  toolbar.appendChild(moreBtn);
+
   const bubble=document.createElement('div');bubble.className='msg-bubble';bubble.textContent=txt;
 
-  body.appendChild(meta);body.appendChild(bubble);
+  bwrap.appendChild(toolbar);
+  bwrap.appendChild(bubble);
+
+  // Reactions row
+  const rc=document.createElement('div');
+  rc.className='reactions-row';
+  rc.id='rc-'+id;
+  renderReactions(rc,reactions,id);
+
+  body.appendChild(meta);body.appendChild(bwrap);body.appendChild(rc);
   if(own){row.appendChild(body);row.appendChild(av);}
   else{row.appendChild(av);row.appendChild(body);}
   list.appendChild(row);
